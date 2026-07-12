@@ -1,6 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { CheckCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,21 +9,11 @@ import { ContentHeader } from "@/components/layout/content-header";
 import { SidebarTrigger } from "@/components/layout/sidebar-trigger";
 import { useArticleNavigation } from "@/hooks/use-keyboard";
 import { useUrlState, type ArticleFilter } from "@/hooks/use-url-state";
-import {
-  itemQueries,
-  useItems,
-  useMarkItemsRead,
-  useMarkItemsUnread,
-} from "@/queries/items";
+import { useArticleList } from "@/hooks/use-article-list";
+import { useMarkItemsRead, useMarkItemsUnread } from "@/queries/items";
 import { useFeedLookup } from "@/queries/feeds";
 import { useGroups } from "@/queries/groups";
-import {
-  useBookmarkLookup,
-  useCreateBookmark,
-  useDeleteBookmark,
-  useStarredItems,
-} from "@/queries/bookmarks";
-import { queryKeys } from "@/queries/keys";
+import { useCreateBookmark, useDeleteBookmark } from "@/queries/bookmarks";
 import { getFaviconUrl } from "@/lib/api/favicon";
 import { useI18n } from "@/lib/i18n";
 import type { Item } from "@/lib/api";
@@ -40,79 +29,33 @@ export function ArticleList() {
     selectedArticleId,
     setSelectedArticle,
   } = useUrlState();
-  const queryClient = useQueryClient();
-  const [starredUnreadOverrides, setStarredUnreadOverrides] = useState<
-    Record<number, boolean>
-  >({});
 
-  const isStarredMode = articleFilter === "starred";
-
-  // Items query for non-starred modes
-  const itemsQuery = useItems({
+  const {
+    articles,
+    hasMore,
+    isLoading,
+    isLoadingMore,
+    fetchNextPage,
+    isItemStarred,
+    getBookmarkByItemId,
+  } = useArticleList({
     feedId: selectedFeedId,
     groupId: selectedGroupId,
-    unread: articleFilter === "unread" ? true : undefined,
+    articleFilter,
   });
 
   const { data: groups = [] } = useGroups();
   const { feeds, getFeedById, isLoading: isFeedsLoading } = useFeedLookup();
   const markItemsRead = useMarkItemsRead();
   const markItemsUnread = useMarkItemsUnread();
-  const { isItemStarred, getBookmarkByItemId } = useBookmarkLookup();
   const createBookmark = useCreateBookmark();
   const deleteBookmark = useDeleteBookmark();
 
-  // Flatten infinite query pages
-  const items = useMemo(
-    () => itemsQuery.data?.pages.flatMap((p) => p.data) ?? [],
-    [itemsQuery.data],
-  );
-
-  const starredArticles = useStarredItems({
-    feedId: selectedFeedId,
-    groupId: selectedGroupId,
-  });
-
-  const articles = isStarredMode ? starredArticles : items;
-  const getArticleUnread = useCallback(
-    (article: Item) => {
-      if (!isStarredMode) return article.unread;
-
-      const override = starredUnreadOverrides[article.id];
-      if (override !== undefined) return override;
-
-      if (article.id > 0) {
-        const cachedItem = queryClient.getQueryData<Item>(
-          queryKeys.items.detail(article.id),
-        );
-        if (cachedItem) return cachedItem.unread;
-      }
-
-      return article.unread;
-    },
-    [isStarredMode, queryClient, starredUnreadOverrides],
-  );
-
-  const displayArticles = useMemo(
-    () =>
-      articles.map((article) => ({
-        ...article,
-        unread: getArticleUnread(article),
-      })),
-    [articles, getArticleUnread],
-  );
-
-  const hasMore = isStarredMode ? false : itemsQuery.hasNextPage;
-  const isLoading = isStarredMode ? false : itemsQuery.isLoading;
-  const isLoadingMore = itemsQuery.isFetchingNextPage;
-
-  // Setup keyboard navigation
-  const articleIds = displayArticles.map((a) => a.id);
+  const articleIds = articles.map((a) => a.id);
   useArticleNavigation(articleIds, {
     enabled: selectedArticleId === null,
   });
 
-  // Determine title
   let title = t("article.list.all");
   if (selectedFeedId) {
     const feed = getFeedById(selectedFeedId);
@@ -122,56 +65,24 @@ export function ArticleList() {
     title = group?.name ?? t("article.groupFallback");
   }
 
-  const unreadCount = displayArticles.filter((a) => a.unread).length;
+  const unreadCount = articles.filter((a) => a.unread).length;
   const hasNoFeeds = !isFeedsLoading && feeds.length === 0;
 
   const handleToggleRead = useCallback(
     async (article: Item) => {
-      if (isStarredMode && article.id <= 0) {
-        return;
-      }
-
-      let unread = getArticleUnread(article);
-
-      if (isStarredMode && article.id > 0) {
-        try {
-          const detail = await queryClient.ensureQueryData(
-            itemQueries.detail(article.id),
-          );
-          if (detail === undefined) {
-            return;
-          }
-
-          unread = detail.unread;
-        } catch {
-          return;
-        }
-      }
+      if (article.id <= 0) return;
 
       try {
-        if (unread) {
+        if (article.unread) {
           await markItemsRead.mutateAsync([article.id]);
         } else {
           await markItemsUnread.mutateAsync([article.id]);
-        }
-
-        if (isStarredMode) {
-          setStarredUnreadOverrides((prev) => ({
-            ...prev,
-            [article.id]: !unread,
-          }));
         }
       } catch (error) {
         console.error("Failed to toggle read status:", error);
       }
     },
-    [
-      getArticleUnread,
-      isStarredMode,
-      markItemsRead,
-      markItemsUnread,
-      queryClient,
-    ],
+    [markItemsRead, markItemsUnread],
   );
 
   const handleToggleStar = useCallback(
@@ -194,44 +105,14 @@ export function ArticleList() {
   );
 
   const handleMarkAllAsRead = async () => {
-    let unreadIds = displayArticles
+    const unreadIds = articles
       .filter((a) => a.unread && a.id > 0)
       .map((a) => a.id);
-
-    if (isStarredMode) {
-      const ids = displayArticles.filter((a) => a.id > 0).map((a) => a.id);
-      const detailEntries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const detail = await queryClient.ensureQueryData(
-              itemQueries.detail(id),
-            );
-            return [id, detail?.unread ?? false] as const;
-          } catch {
-            return [id, false] as const;
-          }
-        }),
-      );
-
-      unreadIds = detailEntries
-        .filter(([, unread]) => unread)
-        .map(([id]) => id);
-    }
 
     if (unreadIds.length === 0) return;
 
     try {
       await markItemsRead.mutateAsync(unreadIds);
-
-      if (isStarredMode) {
-        setStarredUnreadOverrides((prev) => {
-          const next = { ...prev };
-          for (const id of unreadIds) {
-            next[id] = false;
-          }
-          return next;
-        });
-      }
     } catch (error) {
       console.error("Failed to mark all as read:", error);
     }
@@ -309,7 +190,7 @@ export function ArticleList() {
               )
             ) : (
               <>
-                {displayArticles.map((article) => {
+                {articles.map((article) => {
                   const feed = getFeedById(article.feed_id);
                   const bookmark = getBookmarkByItemId(article.id);
 
@@ -335,7 +216,7 @@ export function ArticleList() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => itemsQuery.fetchNextPage()}
+                      onClick={() => fetchNextPage()}
                       disabled={isLoadingMore}
                       className="gap-2"
                     >

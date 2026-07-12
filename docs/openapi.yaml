@@ -421,12 +421,12 @@ paths:
             minimum: 1
             maximum: 100
             default: 10
-        - name: offset
+        - name: before
           in: query
+          description: Cursor for pagination. Omit on first page. Use the next_cursor value from the previous response.
+          required: false
           schema:
-            type: integer
-            minimum: 0
-            default: 0
+            type: string
         - name: order_by
           in: query
           schema:
@@ -545,6 +545,16 @@ paths:
       tags: [Bookmarks]
       summary: List bookmarks
       parameters:
+        - name: feed_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: group_id
+          in: query
+          schema:
+            type: integer
+            format: int64
         - name: limit
           in: query
           schema:
@@ -552,12 +562,12 @@ paths:
             minimum: 1
             maximum: 100
             default: 50
-        - name: offset
+        - name: before
           in: query
+          description: Cursor for pagination. Omit on first page. Use the next_cursor value from the previous response.
+          required: false
           schema:
-            type: integer
-            minimum: 0
-            default: 0
+            type: string
       responses:
         "200":
           description: Bookmark list
@@ -1022,7 +1032,7 @@ components:
 
     ItemListEnvelope:
       type: object
-      required: [data, total]
+      required: [data, total, next_cursor]
       properties:
         data:
           type: array
@@ -1030,6 +1040,10 @@ components:
             $ref: "#/components/schemas/Item"
         total:
           type: integer
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page. Null when there are no more pages.
 
     MarkItemsRequest:
       type: object
@@ -1095,7 +1109,7 @@ components:
 
     Bookmark:
       type: object
-      required: [id, link, title, content, pub_date, feed_name, created_at]
+      required: [id, link, title, content, pub_date, feed_name, unread, created_at]
       properties:
         id:
           type: integer
@@ -1115,6 +1129,14 @@ components:
           format: int64
         feed_name:
           type: string
+        feed_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: Soft association to the source feed; nil for orphaned bookmarks.
+        unread:
+          type: boolean
+          description: Mirrors the linked item's unread state (false for orphans).
         created_at:
           type: integer
           format: int64
@@ -1128,7 +1150,7 @@ components:
 
     BookmarkListEnvelope:
       type: object
-      required: [data, total]
+      required: [data, total, next_cursor]
       properties:
         data:
           type: array
@@ -1136,6 +1158,10 @@ components:
             $ref: "#/components/schemas/Bookmark"
         total:
           type: integer
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page. Null when there are no more pages.
 
     CreateBookmarkFromItemRequest:
       type: object

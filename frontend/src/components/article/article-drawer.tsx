@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Circle,
   CircleCheck,
@@ -15,17 +14,15 @@ import { useUrlState } from "@/hooks/use-url-state";
 import type { Item } from "@/lib/api";
 import {
   useItem,
-  useItems,
   useMarkItemsRead,
   useMarkItemsUnread,
 } from "@/queries/items";
 import { useFeedLookup } from "@/queries/feeds";
 import {
-  useBookmarkLookup,
   useCreateBookmark,
   useDeleteBookmark,
-  useStarredItems,
 } from "@/queries/bookmarks";
+import { useArticleList } from "@/hooks/use-article-list";
 import { useArticleNavigation } from "@/hooks/use-keyboard";
 import { useI18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
@@ -45,33 +42,23 @@ export function ArticleDrawer() {
     articleFilter,
   } = useUrlState();
   const { getFeedById } = useFeedLookup();
-  const isStarredMode = articleFilter === "starred";
 
-  const itemsQuery = useItems({
-    feedId: selectedFeedId,
-    groupId: selectedGroupId,
-    unread: articleFilter === "unread" ? true : undefined,
-  });
-  const articles = useMemo(
-    () => itemsQuery.data?.pages.flatMap((p) => p.data) ?? [],
-    [itemsQuery.data],
-  );
-  const starredArticles = useStarredItems({
-    feedId: selectedFeedId,
-    groupId: selectedGroupId,
-  });
-  const listArticles = isStarredMode ? starredArticles : articles;
+  const { articles, isStarredMode, isItemStarred, getBookmarkByItemId } =
+    useArticleList({
+      feedId: selectedFeedId,
+      groupId: selectedGroupId,
+      articleFilter,
+    });
 
   const markRead = useMarkItemsRead();
   const markUnread = useMarkItemsUnread();
-  const { isItemStarred, getBookmarkByItemId } = useBookmarkLookup();
   const createBookmark = useCreateBookmark();
   const deleteBookmark = useDeleteBookmark();
 
-  const articleIds = listArticles.map((a) => a.id);
+  const articleIds = articles.map((a) => a.id);
 
   const storeArticle = selectedArticleId
-    ? (listArticles.find((i) => i.id === selectedArticleId) ?? null)
+    ? (articles.find((i) => i.id === selectedArticleId) ?? null)
     : null;
 
   const shouldFetchArticle =
@@ -86,8 +73,7 @@ export function ArticleDrawer() {
   const article: Item | null =
     (isStarredMode ? fetchedArticle ?? storeArticle : storeArticle ?? fetchedArticle) ??
     null;
-  const canToggleRead =
-    article !== null && article.id > 0 && (!isStarredMode || fetchedArticle !== undefined);
+  const canToggleRead = article !== null && article.id > 0;
   const feed = article ? getFeedById(article.feed_id) : null;
   const bookmark = article ? getBookmarkByItemId(article.id) : null;
   const starred = article ? isItemStarred(article.id) : false;

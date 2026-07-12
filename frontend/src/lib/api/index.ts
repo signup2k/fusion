@@ -16,7 +16,7 @@ import type {
   CreateBookmarkRequest,
   MarkItemsReadRequest,
   ListItemsParams,
-  ImportOpmlResponse,
+  ListBookmarksParams,
   BatchCreateFeedsRequest,
   BatchCreateFeedsResponse,
   SearchResponse,
@@ -86,7 +86,7 @@ export const itemAPI = {
     if (params?.unread !== undefined)
       query.set("unread", params.unread.toString());
     if (params?.limit) query.set("limit", params.limit.toString());
-    if (params?.offset) query.set("offset", params.offset.toString());
+    if (params?.before) query.set("before", params.before);
     if (params?.order_by) query.set("order_by", params.order_by);
 
     const queryString = query.toString();
@@ -106,11 +106,12 @@ export const itemAPI = {
 
 // Bookmark APIs
 export const bookmarkAPI = {
-  list: (limit = 50, offset = 0) => {
-    const query = new URLSearchParams({
-      limit: limit.toString(),
-      offset: offset.toString(),
-    });
+  list: (params: ListBookmarksParams = {}) => {
+    const query = new URLSearchParams();
+    if (params.feed_id) query.set("feed_id", params.feed_id.toString());
+    if (params.group_id) query.set("group_id", params.group_id.toString());
+    query.set("limit", (params.limit ?? 50).toString());
+    if (params.before) query.set("before", params.before);
     return api.get<ListAPIResponse<Bookmark>>(`/bookmarks?${query}`);
   },
 
@@ -128,31 +129,6 @@ export const searchAPI = {
     api.get<APIResponse<SearchResponse>>(
       `/search?q=${encodeURIComponent(q)}&limit=${limit}`,
     ),
-};
-
-// OPML APIs
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
-
-export const opmlAPI = {
-  import: async (file: File): Promise<APIResponse<ImportOpmlResponse>> => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await fetch(`${API_BASE}/opml/import`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  },
 };
 
 export * from "./types";
