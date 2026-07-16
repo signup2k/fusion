@@ -7,6 +7,7 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -73,11 +74,35 @@ export function ArticleDrawer() {
   const article: Item | null =
     (isStarredMode ? fetchedArticle ?? storeArticle : storeArticle ?? fetchedArticle) ??
     null;
+  const autoReadArticleIdRef = useRef<number | null>(null);
   const canToggleRead = article !== null && article.id > 0;
   const feed = article ? getFeedById(article.feed_id) : null;
   const bookmark = article ? getBookmarkByItemId(article.id) : null;
   const starred = article ? isItemStarred(article.id) : false;
   const safeArticleLink = article ? toSafeExternalUrl(article.link) : null;
+
+  useEffect(() => {
+    if (selectedArticleId === null) {
+      autoReadArticleIdRef.current = null;
+      return;
+    }
+
+    if (
+      !article ||
+      article.id <= 0 ||
+      article.id !== selectedArticleId ||
+      autoReadArticleIdRef.current === article.id
+    ) {
+      return;
+    }
+
+    autoReadArticleIdRef.current = article.id;
+    if (!article.unread) return;
+
+    void markRead.mutateAsync([article.id]).catch((error) => {
+      console.error("Failed to automatically mark article as read:", error);
+    });
+  }, [article, markRead, selectedArticleId]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
