@@ -130,12 +130,28 @@
   }
 }
 
+html[data-font-size="small"] {
+  font-size: 87.5%;
+}
+
+html[data-font-size="default"] {
+  font-size: 100%;
+}
+
+html[data-font-size="large"] {
+  font-size: 112.5%;
+}
+
+html[data-font-size="xlarge"] {
+  font-size: 125%;
+}
+
 .sidebar-typography {
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont,
     "Segoe UI Variable Display", "Segoe UI", Helvetica,
     "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial,
     sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
@@ -143,7 +159,7 @@
   --typeset-font-body: var(--font-geist);
   --typeset-font-heading: var(--font-geist);
   --typeset-font-mono: var(--font-geist-mono);
-  --typeset-size: 15px;
+  --typeset-size: 0.9375rem;
   --typeset-leading: 1.75;
   --typeset-flow: 1.25em;
 }

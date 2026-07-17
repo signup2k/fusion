@@ -20,11 +20,13 @@ setUnauthorizedCallback(() => {
   window.location.href = "/login";
 });
 
-const initialLocale = usePreferencesStore.getState().locale;
-document.documentElement.lang = initialLocale;
-void preloadLocaleMessages(initialLocale);
+const initialPreferences = usePreferencesStore.getState();
+document.documentElement.lang = initialPreferences.locale;
+document.documentElement.dataset.fontSize = initialPreferences.fontSize;
+void preloadLocaleMessages(initialPreferences.locale);
 usePreferencesStore.subscribe((state) => {
   document.documentElement.lang = state.locale;
+  document.documentElement.dataset.fontSize = state.fontSize;
   void preloadLocaleMessages(state.locale);
 });
 

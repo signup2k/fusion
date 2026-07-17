@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import {
   articlePageSizeOptions,
+  fontSizeOptions,
   supportedLocales,
   usePreferencesStore,
   useUIStore,
@@ -60,8 +61,14 @@ function AppearanceContent() {
   const { theme, setTheme } = useTheme();
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const setShortcutsOpen = useUIStore((s) => s.setShortcutsOpen);
-  const { locale, articlePageSize, setLocale, setArticlePageSize } =
-    usePreferencesStore();
+  const {
+    locale,
+    articlePageSize,
+    fontSize,
+    setLocale,
+    setArticlePageSize,
+    setFontSize,
+  } = usePreferencesStore();
 
   return (
     <div className="space-y-5">
@@ -81,6 +88,33 @@ function AppearanceContent() {
             {supportedLocales.map((localeCode) => (
               <SelectItem key={localeCode} value={localeCode}>
                 {localeLabels[localeCode] ?? localeCode}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Font size */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">{t("settings.fontSize.label")}</p>
+          <p className="text-[13px] text-muted-foreground">
+            {t("settings.fontSize.description")}
+          </p>
+        </div>
+        <Select
+          value={fontSize}
+          onValueChange={(value) => {
+            if (value) setFontSize(value);
+          }}
+        >
+          <SelectTrigger className="w-auto gap-2 border-border">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {fontSizeOptions.map((size) => (
+              <SelectItem key={size} value={size}>
+                {t(`settings.fontSize.${size}`)}
               </SelectItem>
             ))}
           </SelectContent>

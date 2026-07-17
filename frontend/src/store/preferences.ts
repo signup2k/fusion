@@ -16,8 +16,17 @@ export type AppLocale = (typeof supportedLocales)[number];
 export const articlePageSizeOptions = [10, 20, 30, 50, 100] as const;
 export type ArticlePageSize = (typeof articlePageSizeOptions)[number];
 
+export const fontSizeOptions = [
+  "small",
+  "default",
+  "large",
+  "xlarge",
+] as const;
+export type AppFontSize = (typeof fontSizeOptions)[number];
+
 const localeSet = new Set<AppLocale>(supportedLocales);
 const articlePageSizeSet = new Set<number>(articlePageSizeOptions);
+const fontSizeSet = new Set<string>(fontSizeOptions);
 
 function resolveSupportedLocale(locale: string): AppLocale | null {
   const normalized = locale.toLowerCase().replace("_", "-");
@@ -39,6 +48,7 @@ const defaultLocale: AppLocale =
     resolveSupportedLocale(navigator.language)) ||
   "en";
 const defaultArticlePageSize: ArticlePageSize = 10;
+const defaultFontSize: AppFontSize = "default";
 
 function normalizeLocale(locale: string): AppLocale {
   const supportedLocale = resolveSupportedLocale(locale);
@@ -57,11 +67,21 @@ function normalizeArticlePageSize(size: number): ArticlePageSize {
   return defaultArticlePageSize;
 }
 
+function normalizeFontSize(size: string): AppFontSize {
+  if (fontSizeSet.has(size)) {
+    return size as AppFontSize;
+  }
+
+  return defaultFontSize;
+}
+
 export interface PreferencesState {
   locale: AppLocale;
   articlePageSize: ArticlePageSize;
+  fontSize: AppFontSize;
   setLocale: (locale: string) => void;
   setArticlePageSize: (size: number) => void;
+  setFontSize: (size: string) => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>()(
@@ -69,9 +89,11 @@ export const usePreferencesStore = create<PreferencesState>()(
     (set) => ({
       locale: defaultLocale,
       articlePageSize: defaultArticlePageSize,
+      fontSize: defaultFontSize,
       setLocale: (locale) => set({ locale: normalizeLocale(locale) }),
       setArticlePageSize: (size) =>
         set({ articlePageSize: normalizeArticlePageSize(size) }),
+      setFontSize: (size) => set({ fontSize: normalizeFontSize(size) }),
     }),
     {
       name: "fusion-preferences",
@@ -79,6 +101,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       partialize: (state) => ({
         locale: state.locale,
         articlePageSize: state.articlePageSize,
+        fontSize: state.fontSize,
       }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<PreferencesState> | undefined;
@@ -88,6 +111,9 @@ export const usePreferencesStore = create<PreferencesState>()(
           locale: normalizeLocale(persisted?.locale ?? currentState.locale),
           articlePageSize: normalizeArticlePageSize(
             persisted?.articlePageSize ?? currentState.articlePageSize,
+          ),
+          fontSize: normalizeFontSize(
+            persisted?.fontSize ?? currentState.fontSize,
           ),
         };
       },
