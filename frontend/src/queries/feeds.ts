@@ -125,6 +125,26 @@ export function useRefreshFeeds() {
   });
 }
 
+export function useRefreshFeed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => feedAPI.refreshOne(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.feeds.all });
+      qc.invalidateQueries({ queryKey: queryKeys.items.all });
+    },
+  });
+}
+
+export function useCheckFeed() {
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await feedAPI.check(id);
+      return res.data!;
+    },
+  });
+}
+
 export function useMoveFeedsToGroup() {
   const qc = useQueryClient();
   return useMutation({

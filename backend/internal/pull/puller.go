@@ -25,6 +25,16 @@ type Puller struct {
 	concurrency *semaphore.Weighted
 }
 
+// FeedCheckResult describes a non-persisting fetch and parse check.
+type FeedCheckResult struct {
+	Healthy     bool
+	HTTPStatus  int
+	ItemCount   int
+	NotModified bool
+	SiteURL     string
+	Error       string
+}
+
 func New(st *store.Store, cfg *config.Config) *Puller {
 	return &Puller{
 		store:       st,
@@ -272,4 +282,36 @@ func (p *Puller) RefreshFeed(ctx context.Context, feedID int64) error {
 
 	p.pullFeed(ctx, feed)
 	return nil
+}
+
+// CheckFeed fetches and parses one feed without changing its fetch state or items.
+func (p *Puller) CheckFeed(ctx context.Context, feedID int64) (*FeedCheckResult, error) {
+	feed, err := p.store.GetFeed(feedID)
+	if err != nil {
+		return nil, fmt.Errorf("get feed: %w", err)
+	}
+
+	if err := p.concurrency.Acquire(ctx, 1); err != nil {
+		return nil, err
+	}
+	defer p.concurrency.Release(1)
+
+	// A check must parse a complete response instead of accepting a cached 304.
+	feed.FetchState.ETag = ""
+	feed.FetchState.LastModified = ""
+	fetchResult, fetchErr := FetchAndParse(ctx, feed, p.timeout, p.config.AllowPrivateFeeds)
+	result := &FeedCheckResult{}
+	if fetchResult != nil {
+		result.HTTPStatus = fetchResult.HTTPStatus
+		result.ItemCount = len(fetchResult.Items)
+		result.NotModified = fetchResult.NotModified
+		result.SiteURL = fetchResult.SiteURL
+	}
+	if fetchErr != nil {
+		result.Error = fetchErr.Error()
+		return result, nil
+	}
+
+	result.Healthy = true
+	return result, nil
 }

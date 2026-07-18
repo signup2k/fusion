@@ -39,7 +39,9 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
   useFeedLookup,
+  useCheckFeed,
   useMoveFeedsToGroup,
+  useRefreshFeed,
   useRefreshFeeds,
 } from "@/queries/feeds";
 import { useDeleteGroup, useGroups, useUpdateGroup } from "@/queries/groups";
@@ -61,6 +63,8 @@ function FeedsPage() {
   const deleteGroupMutation = useDeleteGroup();
   const moveFeedsMutation = useMoveFeedsToGroup();
   const refreshFeedsMutation = useRefreshFeeds();
+  const refreshFeedMutation = useRefreshFeed();
+  const checkFeedMutation = useCheckFeed();
 
   const {
     setEditFeedOpen,
@@ -137,6 +141,44 @@ function FeedsPage() {
       toast.success(t("feeds.toast.refreshing"));
     } catch {
       toast.error(t("feeds.toast.refreshFailed"));
+    }
+  };
+
+  const handleRefreshFeed = async (feed: Feed) => {
+    try {
+      await refreshFeedMutation.mutateAsync(feed.id);
+      toast.success(t("feeds.toast.refreshingOne", { name: feed.name }));
+    } catch {
+      toast.error(t("feeds.toast.refreshOneFailed", { name: feed.name }));
+    }
+  };
+
+  const handleCheckFeed = async (feed: Feed) => {
+    try {
+      const result = await checkFeedMutation.mutateAsync(feed.id);
+      if (result.healthy) {
+        toast.success(
+          t("feeds.toast.checkSuccess", {
+            name: feed.name,
+            status: result.http_status,
+            count: result.item_count,
+          }),
+        );
+      } else {
+        toast.error(
+          t("feeds.toast.checkFailed", {
+            name: feed.name,
+            error: result.error ?? t("common.unknown"),
+          }),
+        );
+      }
+    } catch {
+      toast.error(
+        t("feeds.toast.checkFailed", {
+          name: feed.name,
+          error: t("common.unknown"),
+        }),
+      );
     }
   };
 
@@ -368,6 +410,18 @@ function FeedsPage() {
                       onOpenAddFeed={() => setAddFeedOpen(true)}
                       onOpenDeleteGroup={setDeletingGroup}
                       onOpenEditFeed={(feed) => setEditFeedOpen(true, feed)}
+                      onRefreshFeed={(feed) => void handleRefreshFeed(feed)}
+                      onCheckFeed={(feed) => void handleCheckFeed(feed)}
+                      refreshingFeedId={
+                        refreshFeedMutation.isPending
+                          ? (refreshFeedMutation.variables ?? null)
+                          : null
+                      }
+                      checkingFeedId={
+                        checkFeedMutation.isPending
+                          ? (checkFeedMutation.variables ?? null)
+                          : null
+                      }
                       onChangeMobileErrorTooltipFeedId={setMobileErrorTooltipFeedId}
                       t={t}
                     />

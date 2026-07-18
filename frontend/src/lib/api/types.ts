@@ -116,6 +116,15 @@ export interface ValidateFeedResponse {
   feeds: DiscoveredFeed[];
 }
 
+export interface FeedCheckResponse {
+  healthy: boolean;
+  http_status: number;
+  item_count: number;
+  not_modified: boolean;
+  site_url?: string;
+  error?: string;
+}
+
 export interface CreateBookmarkRequest {
   item_id?: number;
   link: string;

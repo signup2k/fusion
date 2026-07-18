@@ -11,6 +11,7 @@ import (
 
 	"github.com/0x2E/fusion/internal/auth"
 	"github.com/0x2E/fusion/internal/config"
+	"github.com/0x2E/fusion/internal/pull"
 	"github.com/0x2E/fusion/internal/store"
 	"github.com/gin-gonic/gin"
 )
@@ -24,6 +25,7 @@ type Handler struct {
 	puller       interface {
 		RefreshFeed(ctx context.Context, feedID int64) error
 		RefreshAll(ctx context.Context) (int, error)
+		CheckFeed(ctx context.Context, feedID int64) (*pull.FeedCheckResult, error)
 	}
 	sessions  map[string]int64        // sessionID -> unix expiry seconds
 	mu        sync.RWMutex            // protects sessions state
@@ -38,6 +40,7 @@ type Handler struct {
 func New(store *store.Store, config *config.Config, puller interface {
 	RefreshFeed(ctx context.Context, feedID int64) error
 	RefreshAll(ctx context.Context) (int, error)
+	CheckFeed(ctx context.Context, feedID int64) (*pull.FeedCheckResult, error)
 }) (*Handler, error) {
 	// Hash password at startup for later verification
 	passwordHash, err := auth.HashPassword(config.Password)
@@ -130,6 +133,7 @@ func (h *Handler) SetupRouter() *gin.Engine {
 			auth.DELETE("/feeds/:id", h.deleteFeed)
 			auth.POST("/feeds/validate", h.validateFeed)
 			auth.POST("/feeds/:id/refresh", h.refreshFeed)
+			auth.POST("/feeds/:id/check", h.checkFeed)
 
 			auth.GET("/items", h.listItems)
 			auth.GET("/items/:id", h.getItem)

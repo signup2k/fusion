@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 
 	"modernc.org/sqlite"
@@ -30,9 +31,6 @@ func New(dbPath string) (*Store, error) {
 			if _, err := conn.ExecContext(ctx, "PRAGMA busy_timeout = 5000", nil); err != nil {
 				return fmt.Errorf("set busy_timeout: %w", err)
 			}
-			if _, err := conn.ExecContext(ctx, "PRAGMA journal_mode = WAL", nil); err != nil {
-				return fmt.Errorf("set journal_mode: %w", err)
-			}
 			return nil
 		})
 	})
@@ -49,6 +47,16 @@ func New(dbPath string) (*Store, error) {
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	var journalMode string
+	if err := db.QueryRow("PRAGMA journal_mode = WAL").Scan(&journalMode); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("set journal_mode: %w", err)
+	}
+	if !strings.EqualFold(journalMode, "wal") {
+		_ = db.Close()
+		return nil, fmt.Errorf("set journal_mode: got %q, want WAL", journalMode)
 	}
 
 	s := &Store{db: db}

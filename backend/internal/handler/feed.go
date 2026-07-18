@@ -50,6 +50,15 @@ type batchCreateFeedsRequest struct {
 	Feeds []batchCreateFeedItem `json:"feeds" binding:"required"`
 }
 
+type checkFeedResponse struct {
+	Healthy     bool   `json:"healthy"`
+	HTTPStatus  int    `json:"http_status"`
+	ItemCount   int    `json:"item_count"`
+	NotModified bool   `json:"not_modified"`
+	SiteURL     string `json:"site_url,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
 type batchCreateFeedItem struct {
 	GroupID int64  `json:"group_id" binding:"required"`
 	Name    string `json:"name" binding:"required"`
@@ -327,6 +336,36 @@ func (h *Handler) refreshFeed(c *gin.Context) {
 	}(id)
 
 	c.Status(http.StatusAccepted)
+}
+
+func (h *Handler) checkFeed(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		badRequestError(c, "invalid id")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(h.config.PullTimeout)*time.Second)
+	defer cancel()
+
+	result, err := h.puller.CheckFeed(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			notFoundError(c, "feed")
+			return
+		}
+		internalError(c, err, "check feed")
+		return
+	}
+
+	dataResponse(c, checkFeedResponse{
+		Healthy:     result.Healthy,
+		HTTPStatus:  result.HTTPStatus,
+		ItemCount:   result.ItemCount,
+		NotModified: result.NotModified,
+		SiteURL:     result.SiteURL,
+		Error:       result.Error,
+	})
 }
 
 func (h *Handler) refreshAllFeeds(c *gin.Context) {

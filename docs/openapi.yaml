@@ -395,6 +395,28 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /feeds/{id}/check:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    post:
+      tags: [Feeds]
+      summary: Fetch and parse one feed without persisting changes
+      responses:
+        "200":
+          description: Feed check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedCheckEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /items:
     get:
       tags: [Items]
@@ -994,6 +1016,30 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ValidateFeedData"
+
+    FeedCheckData:
+      type: object
+      required: [healthy, http_status, item_count, not_modified]
+      properties:
+        healthy:
+          type: boolean
+        http_status:
+          type: integer
+        item_count:
+          type: integer
+        not_modified:
+          type: boolean
+        site_url:
+          type: string
+        error:
+          type: string
+
+    FeedCheckEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/FeedCheckData"
 
     Item:
       type: object

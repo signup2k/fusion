@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/0x2E/fusion/internal/config"
+	"github.com/0x2E/fusion/internal/pull"
 	"github.com/0x2E/fusion/internal/store"
 )
 
@@ -19,6 +20,10 @@ type noopPuller struct{}
 func (noopPuller) RefreshFeed(context.Context, int64) error { return nil }
 
 func (noopPuller) RefreshAll(context.Context) (int, error) { return 0, nil }
+
+func (noopPuller) CheckFeed(context.Context, int64) (*pull.FeedCheckResult, error) {
+	return &pull.FeedCheckResult{Healthy: true}, nil
+}
 
 func newFeverTestHandler(t *testing.T) (*Handler, *store.Store) {
 	t.Helper()

@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronDown, ChevronRight, Folder, Pause, Pencil, Plus, Trash2 } from "lucide-react";
+import { Activity, AlertCircle, ChevronDown, ChevronRight, Folder, Pause, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { FeedFavicon } from "@/components/feed/feed-favicon";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,10 @@ interface FeedGroupCardProps {
   onOpenAddFeed: () => void;
   onOpenDeleteGroup: (group: Group) => void;
   onOpenEditFeed: (feed: Feed) => void;
+  onRefreshFeed: (feed: Feed) => void;
+  onCheckFeed: (feed: Feed) => void;
+  refreshingFeedId: number | null;
+  checkingFeedId: number | null;
   onChangeMobileErrorTooltipFeedId: Dispatch<SetStateAction<number | null>>;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
 }
@@ -57,6 +61,10 @@ export function FeedGroupCard({
   onOpenAddFeed,
   onOpenDeleteGroup,
   onOpenEditFeed,
+  onRefreshFeed,
+  onCheckFeed,
+  refreshingFeedId,
+  checkingFeedId,
   onChangeMobileErrorTooltipFeedId,
   t,
 }: FeedGroupCardProps) {
@@ -259,6 +267,36 @@ export function FeedGroupCard({
                     ? formatDate(feed.fetch_state.last_checked_at)
                     : t("common.unknown")}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => onCheckFeed(feed)}
+                  disabled={checkingFeedId === feed.id}
+                  className="rounded p-1 hover:bg-accent disabled:opacity-50"
+                  aria-label={t("feeds.action.check")}
+                  title={t("feeds.action.check")}
+                >
+                  <Activity
+                    className={cn(
+                      "h-3.5 w-3.5 text-muted-foreground",
+                      checkingFeedId === feed.id && "animate-pulse",
+                    )}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRefreshFeed(feed)}
+                  disabled={refreshingFeedId === feed.id}
+                  className="rounded p-1 hover:bg-accent disabled:opacity-50"
+                  aria-label={t("feeds.action.refresh")}
+                  title={t("feeds.action.refresh")}
+                >
+                  <RefreshCw
+                    className={cn(
+                      "h-3.5 w-3.5 text-muted-foreground",
+                      refreshingFeedId === feed.id && "animate-spin",
+                    )}
+                  />
+                </button>
                 <button
                   type="button"
                   onClick={() => onOpenEditFeed(feed)}

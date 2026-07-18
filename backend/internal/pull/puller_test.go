@@ -90,6 +90,54 @@ func TestRefreshFeedPreservesValidatorsWhen304OmitHeaders(t *testing.T) {
 	}
 }
 
+func TestCheckFeedDoesNotPersistItemsOrFetchState(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer st.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		_, _ = fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Demo</title><link>https://example.com</link>
+<item><guid>g1</guid><title>Item</title><link>https://example.com/1</link></item>
+</channel></rss>`)
+	}))
+	defer server.Close()
+
+	feed, err := st.CreateFeed(1, "Feed A", server.URL, "", "")
+	if err != nil {
+		t.Fatalf("create feed: %v", err)
+	}
+
+	p := New(st, &config.Config{
+		PullInterval:      1800,
+		PullTimeout:       5,
+		PullConcurrency:   1,
+		PullMaxBackoff:    604800,
+		AllowPrivateFeeds: true,
+	})
+
+	result, err := p.CheckFeed(context.Background(), feed.ID)
+	if err != nil {
+		t.Fatalf("check feed: %v", err)
+	}
+	if !result.Healthy || result.HTTPStatus != http.StatusOK || result.ItemCount != 1 {
+		t.Fatalf("unexpected check result: %+v", result)
+	}
+
+	feeds, err := st.ListFeeds()
+	if err != nil {
+		t.Fatalf("list feeds: %v", err)
+	}
+	unchanged := feeds[0]
+	if unchanged.ItemCount != 0 || unchanged.FetchState.LastCheckedAt != 0 {
+		t.Fatalf("check persisted feed data: %+v", unchanged)
+	}
+}
+
 func TestRefreshAllWaitsForRunningJobs(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	st, err := store.New(dbPath)

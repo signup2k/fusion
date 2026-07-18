@@ -156,6 +156,7 @@ mkdir -p "$candidate_dir"
 docker run -d \
   --name "$candidate_name" \
   --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
   --cap-drop ALL \
   --security-opt no-new-privileges:true \
   --env-file "$remote_dir/.env" \
@@ -169,14 +170,28 @@ if ! wait_for_health "$candidate_name" 30; then
   exit 1
 fi
 docker exec "$candidate_name" wget -q -O /dev/null http://127.0.0.1:8080/api/oidc/enabled
+candidate_database_errors=$(docker logs "$candidate_name" 2>&1 |
+  grep -Ec 'disk I/O error|database is locked|SQLITE_BUSY' || true)
+[ "$candidate_database_errors" -eq 0 ] || {
+  echo "candidate logged $candidate_database_errors SQLite errors" >&2
+  false
+}
 cleanup_candidate
 
 cd "$remote_dir"
+if ! grep -Eq '^[[:space:]]*-[[:space:]]*/tmp:' "$compose_file"; then
+  compose_tmp="$compose_file.tmpfs-$short_commit"
+  cp "$compose_file" "$compose_tmp"
+  sed -i '/^[[:space:]]*read_only:[[:space:]]*true/i\    tmpfs:\n      - /tmp:size=64m,mode=1777' "$compose_tmp"
+  docker compose -f "$compose_tmp" config --quiet
+  mv "$compose_tmp" "$compose_file"
+fi
 docker compose config --quiet
 previous_image=$(docker inspect "$container_name" --format '{{.Config.Image}}')
+current_tmpfs=$(docker inspect "$container_name" --format '{{index .HostConfig.Tmpfs "/tmp"}}')
 
 current_health=$(docker inspect "$container_name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}')
-if [ "$previous_image" = "$image" ] && [ "$current_health" = "healthy" ]; then
+if [ "$previous_image" = "$image" ] && [ "$current_health" = "healthy" ] && [ -n "$current_tmpfs" ]; then
   [ "$(sqlite3 "$remote_dir/data/fusion.db" 'PRAGMA quick_check;')" = "ok" ]
   curl -fsS "http://127.0.0.1:8010/api/oidc/enabled" >/dev/null
   curl -fsS "https://$domain/" >/dev/null
@@ -216,7 +231,10 @@ curl -fsS "https://$domain/" >/dev/null
 startup_database_errors=$(docker logs "$container_name" 2>&1 |
   grep -Ec 'disk I/O error|database is locked|SQLITE_BUSY' || true)
 [ "$startup_database_errors" -eq 0 ] ||
-  echo "warning: startup refresh logged $startup_database_errors transient SQLite locking errors" >&2
+  {
+    echo "startup refresh logged $startup_database_errors SQLite errors" >&2
+    false
+  }
 
 observation_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 sleep 5

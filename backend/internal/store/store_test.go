@@ -85,6 +85,14 @@ func TestNew(t *testing.T) {
 	if err := store.db.Ping(); err != nil {
 		t.Errorf("database ping failed: %v", err)
 	}
+
+	var journalMode string
+	if err := store.db.QueryRow("PRAGMA journal_mode").Scan(&journalMode); err != nil {
+		t.Fatalf("read journal mode: %v", err)
+	}
+	if journalMode != "wal" {
+		t.Fatalf("journal mode = %q, want wal", journalMode)
+	}
 }
 
 func TestClose(t *testing.T) {

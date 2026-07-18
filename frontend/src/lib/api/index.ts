@@ -13,6 +13,7 @@ import type {
   UpdateFeedRequest,
   ValidateFeedRequest,
   ValidateFeedResponse,
+  FeedCheckResponse,
   CreateBookmarkRequest,
   MarkItemsReadRequest,
   ListItemsParams,
@@ -72,6 +73,11 @@ export const feedAPI = {
     api.post<APIResponse<ValidateFeedResponse>>("/feeds/validate", data),
 
   refresh: () => api.post<void>("/feeds/refresh"),
+
+  refreshOne: (id: number) => api.post<void>(`/feeds/${id}/refresh`),
+
+  check: (id: number) =>
+    api.post<APIResponse<FeedCheckResponse>>(`/feeds/${id}/check`),
 
   batchCreate: (data: BatchCreateFeedsRequest) =>
     api.post<APIResponse<BatchCreateFeedsResponse>>("/feeds/batch", data),
