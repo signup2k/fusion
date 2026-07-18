@@ -192,3 +192,55 @@ func TestRefreshAllWaitsForRunningJobs(t *testing.T) {
 		}
 	}
 }
+
+func TestRefreshAllPersistsConcurrentFetches(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer st.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		_, _ = fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Demo</title><link>https://example.com</link>
+<item><guid>%s</guid><title>Item</title><link>https://example.com%s</link></item>
+</channel></rss>`, r.URL.Path, r.URL.Path)
+	}))
+	defer server.Close()
+
+	const feedCount = 30
+	for i := range feedCount {
+		path := fmt.Sprintf("/%d", i)
+		if _, err := st.CreateFeed(1, "Feed "+path, server.URL+path, "", ""); err != nil {
+			t.Fatalf("create feed %d: %v", i, err)
+		}
+	}
+
+	p := New(st, &config.Config{
+		PullInterval:      1800,
+		PullTimeout:       5,
+		PullConcurrency:   10,
+		PullMaxBackoff:    604800,
+		AllowPrivateFeeds: true,
+	})
+
+	count, err := p.RefreshAll(context.Background())
+	if err != nil {
+		t.Fatalf("refresh all: %v", err)
+	}
+	if count != feedCount {
+		t.Fatalf("refresh count = %d, want %d", count, feedCount)
+	}
+
+	feeds, err := st.ListFeeds()
+	if err != nil {
+		t.Fatalf("list feeds: %v", err)
+	}
+	for _, feed := range feeds {
+		if feed.ItemCount != 1 || feed.FetchState.LastSuccessAt == 0 {
+			t.Fatalf("feed %d was not fully persisted: %+v", feed.ID, feed)
+		}
+	}
+}

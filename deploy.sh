@@ -233,6 +233,8 @@ startup_database_errors=$(docker logs "$container_name" 2>&1 |
 [ "$startup_database_errors" -eq 0 ] ||
   {
     echo "startup refresh logged $startup_database_errors SQLite errors" >&2
+    docker logs "$container_name" 2>&1 |
+      grep -E 'disk I/O error|database is locked|SQLITE_BUSY' >&2 || true
     false
   }
 

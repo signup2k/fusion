@@ -23,6 +23,7 @@ type Puller struct {
 	timeout     time.Duration
 	maxBackoff  time.Duration
 	concurrency *semaphore.Weighted
+	writeMu     sync.Mutex
 }
 
 // FeedCheckResult describes a non-persisting fetch and parse check.
@@ -96,6 +97,11 @@ func (p *Puller) pullFeed(ctx context.Context, feed *model.Feed) {
 
 	result, err := FetchAndParse(ctx, feed, p.timeout, p.config.AllowPrivateFeeds)
 	checkedAt := time.Now().Unix()
+
+	// Keep network fetches concurrent while serializing SQLite persistence.
+	p.writeMu.Lock()
+	defer p.writeMu.Unlock()
+
 	if err != nil {
 		httpStatus := 0
 		retryAfterUntil := int64(0)
