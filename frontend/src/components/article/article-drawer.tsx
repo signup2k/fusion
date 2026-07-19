@@ -242,7 +242,7 @@ export function ArticleDrawer() {
             </div>
 
             {/* Content */}
-            <ScrollArea className="min-h-0 flex-1">
+            <ScrollArea key={article.id} className="min-h-0 flex-1">
               <article className="min-w-0 px-5 py-6 sm:px-12 sm:py-8">
                 <div className="space-y-3">
                   <h1 className="text-[28px] font-bold leading-[1.3]">
