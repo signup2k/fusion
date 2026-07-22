@@ -74,7 +74,7 @@ export function ArticleItem({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <h3
           className={cn(
-            "line-clamp-2 text-[15px] leading-snug font-medium",
+            "line-clamp-2 text-lg leading-snug font-medium",
             article.unread ? "text-foreground" : "text-muted-foreground",
           )}
         >
