@@ -47,7 +47,7 @@ function normalizeFeedSort(sort: string): FeedSort {
   return defaultFeedSort;
 }
 
-function normalizeFeedOrder(order: unknown): number[] {
+function normalizeIdOrder(order: unknown): number[] {
   if (!Array.isArray(order)) {
     return [];
   }
@@ -73,11 +73,13 @@ export interface PreferencesState {
   fontSize: AppFontSize;
   feedSort: FeedSort;
   feedOrder: number[];
+  groupOrder: number[];
   groupAutoExpand: Record<number, boolean>;
   setArticlePageSize: (size: number) => void;
   setFontSize: (size: string) => void;
   setFeedSort: (sort: string) => void;
   setFeedOrder: (order: number[]) => void;
+  setGroupOrder: (order: number[]) => void;
   setGroupAutoExpand: (groupId: number, autoExpand: boolean) => void;
 }
 
@@ -88,12 +90,14 @@ export const usePreferencesStore = create<PreferencesState>()(
       fontSize: defaultFontSize,
       feedSort: defaultFeedSort,
       feedOrder: [],
+      groupOrder: [],
       groupAutoExpand: {},
       setArticlePageSize: (size) =>
         set({ articlePageSize: normalizeArticlePageSize(size) }),
       setFontSize: (size) => set({ fontSize: normalizeFontSize(size) }),
       setFeedSort: (sort) => set({ feedSort: normalizeFeedSort(sort) }),
-      setFeedOrder: (order) => set({ feedOrder: normalizeFeedOrder(order) }),
+      setFeedOrder: (order) => set({ feedOrder: normalizeIdOrder(order) }),
+      setGroupOrder: (order) => set({ groupOrder: normalizeIdOrder(order) }),
       setGroupAutoExpand: (groupId, autoExpand) =>
         set((state) => ({
           groupAutoExpand: {
@@ -110,6 +114,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         fontSize: state.fontSize,
         feedSort: state.feedSort,
         feedOrder: state.feedOrder,
+        groupOrder: state.groupOrder,
         groupAutoExpand: state.groupAutoExpand,
       }),
       merge: (persistedState, currentState) => {
@@ -126,7 +131,8 @@ export const usePreferencesStore = create<PreferencesState>()(
           feedSort: normalizeFeedSort(
             persisted?.feedSort ?? currentState.feedSort,
           ),
-          feedOrder: normalizeFeedOrder(persisted?.feedOrder),
+          feedOrder: normalizeIdOrder(persisted?.feedOrder),
+          groupOrder: normalizeIdOrder(persisted?.groupOrder),
           groupAutoExpand: normalizeGroupAutoExpand(
             persisted?.groupAutoExpand,
           ),

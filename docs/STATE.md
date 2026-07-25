@@ -1,6 +1,7 @@
 # Project State
 
-- 2026-07-25: Feed ordering, per-folder automatic expansion, and Simplified Chinese-only UI are implemented and verified locally.
-- User confirmed the final behavior specification: `docs/behavior-specs/20260725_feed-order-folder-expansion.feature.md`.
-- TypeScript compilation, production build, and local browser smoke tests passed.
-- Commit and production deployment are authorized and in progress.
+- 2026-07-25: Commit `c71f27e` deployed feed ordering, per-folder automatic expansion, and the Simplified Chinese-only UI to production.
+- Folder manual ordering is implemented locally as a follow-up and documented in `docs/behavior-specs/20260725_feed-order-folder-expansion.feature.md`.
+- TypeScript compilation and production build passed for the follow-up.
+- Browser smoke testing was unavailable because the managed execution environment denied local port binding.
+- The folder-ordering follow-up has not been committed or deployed.

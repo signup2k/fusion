@@ -27,8 +27,14 @@ export function FeedList() {
   const { feeds } = useFeedLookup();
   const { getTotalUnreadCount } = useUnreadCounts();
   const { total: starredTotal } = useBookmarkLookup();
-  const { feedSort, feedOrder, setFeedSort, setFeedOrder } =
-    usePreferencesStore();
+  const {
+    feedSort,
+    feedOrder,
+    groupOrder,
+    setFeedSort,
+    setFeedOrder,
+    setGroupOrder,
+  } = usePreferencesStore();
   const {
     selectedFeedId,
     selectedGroupId,
@@ -43,6 +49,18 @@ export function FeedList() {
     isOnHomePage && selectedFeedId === null && selectedGroupId === null;
   const totalUnread = getTotalUnreadCount();
   const starredCount = starredTotal;
+  const manualGroupOrder = [
+    ...groupOrder.filter((id) => groups.some((group) => group.id === id)),
+    ...groups
+      .map((group) => group.id)
+      .filter((id) => !groupOrder.includes(id)),
+  ];
+  const groupRank = new Map(
+    manualGroupOrder.map((id, index) => [id, index]),
+  );
+  const sortedGroups = [...groups].sort(
+    (a, b) => (groupRank.get(a.id) ?? 0) - (groupRank.get(b.id) ?? 0),
+  );
   const manualFeedOrder = [
     ...feedOrder.filter((id) => feeds.some((feed) => feed.id === id)),
     ...feeds
@@ -88,6 +106,21 @@ export function FeedList() {
       nextOrder[feedOrderIndex],
     ];
     setFeedOrder(nextOrder);
+  };
+
+  const moveGroup = (groupId: number, direction: "up" | "down") => {
+    const currentIndex = manualGroupOrder.indexOf(groupId);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (currentIndex < 0 || manualGroupOrder[targetIndex] === undefined) {
+      return;
+    }
+
+    const nextOrder = [...manualGroupOrder];
+    [nextOrder[currentIndex], nextOrder[targetIndex]] = [
+      nextOrder[targetIndex],
+      nextOrder[currentIndex],
+    ];
+    setGroupOrder(nextOrder);
   };
 
   const sortLabels: Record<FeedSort, string> = {
@@ -195,7 +228,7 @@ export function FeedList() {
 
         {/* Feed groups */}
         <div className="w-full min-w-0 space-y-0.5">
-          {groups.map((group) => {
+          {sortedGroups.map((group, index) => {
             const groupFeeds = sortedFeeds.filter(
               (feed) => feed.group_id === group.id,
             );
@@ -206,6 +239,9 @@ export function FeedList() {
                 groupId={group.id}
                 name={group.name}
                 feeds={groupFeeds}
+                canMoveUp={index > 0}
+                canMoveDown={index < sortedGroups.length - 1}
+                onMoveGroup={(direction) => moveGroup(group.id, direction)}
                 manualSorting={feedSort === "manual"}
                 onMoveFeed={(feedId, direction) =>
                   moveFeed(

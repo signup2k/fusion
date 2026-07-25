@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, MoreHorizontal } from "lucide-react";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -21,6 +21,9 @@ interface FeedGroupProps {
   groupId: number;
   name: string;
   feeds: Feed[];
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveGroup: (direction: "up" | "down") => void;
   manualSorting: boolean;
   onMoveFeed: (feedId: number, direction: "up" | "down") => void;
 }
@@ -29,6 +32,9 @@ export function FeedGroup({
   groupId,
   name,
   feeds,
+  canMoveUp,
+  canMoveDown,
+  onMoveGroup,
   manualSorting,
   onMoveFeed,
 }: FeedGroupProps) {
@@ -90,6 +96,26 @@ export function FeedGroup({
             </span>
           )}
         </button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
+          onClick={() => onMoveGroup("up")}
+          disabled={!canMoveUp}
+          aria-label={t("group.order.moveUp", { name })}
+        >
+          <ArrowUp className="text-muted-foreground" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
+          onClick={() => onMoveGroup("down")}
+          disabled={!canMoveDown}
+          aria-label={t("group.order.moveDown", { name })}
+        >
+          <ArrowDown className="text-muted-foreground" />
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={

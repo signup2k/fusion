@@ -11,7 +11,7 @@
 
 Purpose: Records the current handoff state and whether completed behavior specifications are awaiting user review.
 
-### docs/behavior-specs/20260725_feed-order-folder-expansion.feature.md (~82 lines, Markdown/Gherkin, map-updated 2026-07-25)
+### docs/behavior-specs/20260725_feed-order-folder-expansion.feature.md (~94 lines, Markdown/Gherkin, map-updated 2026-07-25)
 
 Purpose: Defines reviewable behavior for the Simplified Chinese-only UI, feed sorting, manual movement, persistence, folder expansion, and preference recovery.
 
@@ -221,14 +221,14 @@ Structure:
 - `normalizeItemFilters` (L12): converts optional list filters into stable query-key values.
 - `queryKeys` (L39): defines hierarchical keys used for cache reads, invalidation, and optimistic updates.
 
-### frontend/src/store/preferences.ts (~141 lines, TypeScript, map-updated 2026-07-25)
+### frontend/src/store/preferences.ts (~143 lines, TypeScript, map-updated 2026-07-25)
 
-Purpose: Owns persisted font/page-size, feed-order, and folder-expansion preferences and defensively validates restored values.
+Purpose: Owns persisted font/page-size, feed/folder ordering, and folder-expansion preferences and defensively validates restored values.
 Structure:
 
 - preference option types (near L4): article page sizes, font sizes, and feed sort modes.
-- normalization helpers (near L24): sanitize persisted scalar, manual feed-order, and per-group expansion values.
-- `PreferencesState` / `usePreferencesStore` (near L75): Zustand store persisted under `fusion-preferences`.
+- normalization helpers (near L24): sanitize persisted scalar, manual ID-order lists, and per-group expansion values.
+- `PreferencesState` / `usePreferencesStore` (near L71): Zustand store persisted under `fusion-preferences`.
 Gotchas: New persisted values must be included in both `partialize` and the defensive `merge` normalization.
 
 ### frontend/src/store/index.ts (~7 lines, TypeScript, map-updated 2026-07-17)
@@ -252,22 +252,23 @@ Structure:
 - `SettingsDialog` (L286): owns responsive tab navigation and dialog layout.
 Depends on: persisted preference/UI stores, theme provider, Chinese message lookup, PWA install hook.
 
-### frontend/src/components/feed/feed-list.tsx (~244 lines, TSX, map-updated 2026-07-25)
+### frontend/src/components/feed/feed-list.tsx (~280 lines, TSX, map-updated 2026-07-25)
 
-Purpose: Renders the navigation sidebar filters, folders, feeds, and persisted feed-sort controls.
+Purpose: Renders the navigation sidebar filters, manually ordered folders, feeds, and persisted feed-sort controls.
 Structure:
 
 - `FeedList` (L24): sorts feeds by manual position, name, unread count, or creation time and renders group/ungrouped sections.
 - `moveFeed` (near L72): swaps adjacent sibling IDs in the persisted global manual-order list.
+- `moveGroup` (near L111): swaps adjacent folder IDs in the persisted folder-order list.
 Depends on: group/feed/bookmark queries, URL state, preferences store, `FeedGroup`, `FeedItem`.
-Gotchas: Manual moves are constrained to siblings in the same folder; non-manual sorting preserves the saved manual order for later reuse.
+Gotchas: Feed moves are constrained to siblings in the same folder; new feeds and folders append after saved manual orders.
 
-### frontend/src/components/feed/feed-group.tsx (~140 lines, TSX, map-updated 2026-07-25)
+### frontend/src/components/feed/feed-group.tsx (~166 lines, TSX, map-updated 2026-07-25)
 
-Purpose: Renders one collapsible feed folder with its unread total and per-folder automatic-expansion preference.
+Purpose: Renders one collapsible feed folder with manual position controls, unread total, and per-folder automatic-expansion preference.
 Structure:
 
-- `FeedGroup` (L28): defaults open unless the persisted group override disables automatic expansion; manual chevron toggling remains available.
+- `FeedGroup` (L31): exposes accessible folder up/down controls and defaults open unless the persisted group override disables automatic expansion.
 - folder menu (near L91): toggles automatic expansion and immediately synchronizes the current open state.
 Depends on: preferences store, URL state, Base UI collapsible/menu, `FeedItem`.
 

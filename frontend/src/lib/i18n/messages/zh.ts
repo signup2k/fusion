@@ -120,6 +120,8 @@ export const zhMessages = {
   "group.expansion.collapse": "收起{name}",
   "group.expansion.expand": "展开{name}",
   "group.expansion.settings": "文件夹展开方式",
+  "group.order.moveDown": "下移文件夹“{name}”",
+  "group.order.moveUp": "上移文件夹“{name}”",
   "feed.edit.unsubscribe": "取消订阅",
   "feed.select.description": "发现多个订阅，请选择一个填入地址。",
   "feed.select.fallback": "订阅 {index}",
