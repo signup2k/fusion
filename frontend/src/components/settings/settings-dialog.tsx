@@ -14,12 +14,11 @@ import {
 import {
   articlePageSizeOptions,
   fontSizeOptions,
-  supportedLocales,
   usePreferencesStore,
   useUIStore,
 } from "@/store";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
-import { localeLabels, useI18n } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -62,38 +61,14 @@ function AppearanceContent() {
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const setShortcutsOpen = useUIStore((s) => s.setShortcutsOpen);
   const {
-    locale,
     articlePageSize,
     fontSize,
-    setLocale,
     setArticlePageSize,
     setFontSize,
   } = usePreferencesStore();
 
   return (
     <div className="space-y-5">
-      {/* Language */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <p className="text-sm font-medium">{t("settings.language.label")}</p>
-          <p className="text-[13px] text-muted-foreground">
-            {t("settings.language.description")}
-          </p>
-        </div>
-        <Select value={locale} onValueChange={(v) => { if (v) setLocale(v); }}>
-          <SelectTrigger className="w-auto gap-2 border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {supportedLocales.map((localeCode) => (
-              <SelectItem key={localeCode} value={localeCode}>
-                {localeLabels[localeCode] ?? localeCode}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Font size */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">

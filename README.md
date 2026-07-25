@@ -126,7 +126,6 @@ Legacy env names (`DB`, `PASSWORD`, `PORT`) are still accepted for backward comp
 
 - Requirements: Go `1.25+`, Node.js `24+`, pnpm
 - Helpful commands are in [`scripts.sh`](./scripts.sh)
-- Frontend i18n key check: `cd frontend && npm run check:i18n`
 
 Example:
 

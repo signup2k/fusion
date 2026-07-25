@@ -1,7 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import DOMPurify from "dompurify";
-import { getPreferredLocale } from "@/store/preferences";
+
+const APP_LOCALE = "zh-CN";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -13,10 +14,9 @@ export function unixToDate(timestamp: number): Date {
 
 export function formatDate(timestamp: number): string {
   const date = unixToDate(timestamp);
-  const locale = getPreferredLocale();
   const now = new Date();
   const diff = now.getTime() - date.getTime();
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat(APP_LOCALE, { numeric: "auto" });
 
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
@@ -27,13 +27,13 @@ export function formatDate(timestamp: number): string {
   if (hours < 24) return rtf.format(-hours, "hour");
   if (days < 7) return rtf.format(-days, "day");
 
-  return date.toLocaleDateString(locale);
+  return date.toLocaleDateString(APP_LOCALE);
 }
 
 export function formatRelativeTime(timestamp: number): string {
   const date = unixToDate(timestamp);
   const now = new Date();
-  const rtf = new Intl.RelativeTimeFormat(getPreferredLocale(), {
+  const rtf = new Intl.RelativeTimeFormat(APP_LOCALE, {
     numeric: "auto",
   });
 

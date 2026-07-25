@@ -1,6 +1,4 @@
-import type { PartialMessages } from "./types";
-
-export const zhMessages: PartialMessages = {
+export const zhMessages = {
   "common.add": "添加",
   "common.cancel": "取消",
   "common.create": "创建",
@@ -63,8 +61,6 @@ export const zhMessages: PartialMessages = {
   "settings.fontSize.small": "小",
   "settings.fontSize.xlarge": "超大",
   "settings.installCancelled": "已取消安装",
-  "settings.language.description": "选择你偏好的语言",
-  "settings.language.label": "语言",
   "settings.shortcuts.description": "查看所有可用的键盘快捷键",
   "settings.shortcuts.label": "键盘快捷键",
   "settings.shortcuts.open": "查看",
@@ -113,6 +109,17 @@ export const zhMessages: PartialMessages = {
   "feed.edit.suspendDescription": "暂停自动更新",
   "feed.edit.suspendLabel": "暂停订阅",
   "feed.edit.title": "编辑订阅",
+  "feed.order.moveDown": "下移订阅",
+  "feed.order.moveUp": "上移订阅",
+  "feed.sort.label": "订阅排序",
+  "feed.sort.manual": "手工排序",
+  "feed.sort.name": "按名称",
+  "feed.sort.newest": "最近添加",
+  "feed.sort.unread": "按未读数",
+  "group.expansion.auto": "自动展开",
+  "group.expansion.collapse": "收起{name}",
+  "group.expansion.expand": "展开{name}",
+  "group.expansion.settings": "文件夹展开方式",
   "feed.edit.unsubscribe": "取消订阅",
   "feed.select.description": "发现多个订阅，请选择一个填入地址。",
   "feed.select.fallback": "订阅 {index}",
@@ -192,4 +199,6 @@ export const zhMessages: PartialMessages = {
   "pwa.update.description": "重新加载以使用最新版本的 Fusion。",
   "pwa.update.reload": "重新加载",
   "pwa.update.title": "发现更新",
-};
+} as const;
+
+export type TranslationKey = keyof typeof zhMessages;

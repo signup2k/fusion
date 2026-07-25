@@ -1,18 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-export const supportedLocales = [
-  "en",
-  "zh",
-  "de",
-  "fr",
-  "es",
-  "ru",
-  "pt",
-  "sv",
-] as const;
-export type AppLocale = (typeof supportedLocales)[number];
-
 export const articlePageSizeOptions = [10, 20, 30, 50, 100] as const;
 export type ArticlePageSize = (typeof articlePageSizeOptions)[number];
 
@@ -24,40 +12,16 @@ export const fontSizeOptions = [
 ] as const;
 export type AppFontSize = (typeof fontSizeOptions)[number];
 
-const localeSet = new Set<AppLocale>(supportedLocales);
+export const feedSortOptions = ["manual", "name", "unread", "newest"] as const;
+export type FeedSort = (typeof feedSortOptions)[number];
+
 const articlePageSizeSet = new Set<number>(articlePageSizeOptions);
 const fontSizeSet = new Set<string>(fontSizeOptions);
+const feedSortSet = new Set<string>(feedSortOptions);
 
-function resolveSupportedLocale(locale: string): AppLocale | null {
-  const normalized = locale.toLowerCase().replace("_", "-");
-
-  if (localeSet.has(normalized as AppLocale)) {
-    return normalized as AppLocale;
-  }
-
-  const languageCode = normalized.split("-")[0];
-  if (localeSet.has(languageCode as AppLocale)) {
-    return languageCode as AppLocale;
-  }
-
-  return null;
-}
-
-const defaultLocale: AppLocale =
-  (typeof navigator !== "undefined" &&
-    resolveSupportedLocale(navigator.language)) ||
-  "en";
 const defaultArticlePageSize: ArticlePageSize = 10;
 const defaultFontSize: AppFontSize = "default";
-
-function normalizeLocale(locale: string): AppLocale {
-  const supportedLocale = resolveSupportedLocale(locale);
-  if (supportedLocale) {
-    return supportedLocale;
-  }
-
-  return defaultLocale;
-}
+const defaultFeedSort: FeedSort = "manual";
 
 function normalizeArticlePageSize(size: number): ArticlePageSize {
   if (articlePageSizeSet.has(size)) {
@@ -75,52 +39,99 @@ function normalizeFontSize(size: string): AppFontSize {
   return defaultFontSize;
 }
 
+function normalizeFeedSort(sort: string): FeedSort {
+  if (feedSortSet.has(sort)) {
+    return sort as FeedSort;
+  }
+
+  return defaultFeedSort;
+}
+
+function normalizeFeedOrder(order: unknown): number[] {
+  if (!Array.isArray(order)) {
+    return [];
+  }
+
+  return [...new Set(order.filter((id): id is number => Number.isInteger(id)))];
+}
+
+function normalizeGroupAutoExpand(value: unknown): Record<number, boolean> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([groupId, autoExpand]) =>
+        Number.isInteger(Number(groupId)) && typeof autoExpand === "boolean",
+    ),
+  );
+}
+
 export interface PreferencesState {
-  locale: AppLocale;
   articlePageSize: ArticlePageSize;
   fontSize: AppFontSize;
-  setLocale: (locale: string) => void;
+  feedSort: FeedSort;
+  feedOrder: number[];
+  groupAutoExpand: Record<number, boolean>;
   setArticlePageSize: (size: number) => void;
   setFontSize: (size: string) => void;
+  setFeedSort: (sort: string) => void;
+  setFeedOrder: (order: number[]) => void;
+  setGroupAutoExpand: (groupId: number, autoExpand: boolean) => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>()(
   persist(
     (set) => ({
-      locale: defaultLocale,
       articlePageSize: defaultArticlePageSize,
       fontSize: defaultFontSize,
-      setLocale: (locale) => set({ locale: normalizeLocale(locale) }),
+      feedSort: defaultFeedSort,
+      feedOrder: [],
+      groupAutoExpand: {},
       setArticlePageSize: (size) =>
         set({ articlePageSize: normalizeArticlePageSize(size) }),
       setFontSize: (size) => set({ fontSize: normalizeFontSize(size) }),
+      setFeedSort: (sort) => set({ feedSort: normalizeFeedSort(sort) }),
+      setFeedOrder: (order) => set({ feedOrder: normalizeFeedOrder(order) }),
+      setGroupAutoExpand: (groupId, autoExpand) =>
+        set((state) => ({
+          groupAutoExpand: {
+            ...state.groupAutoExpand,
+            [groupId]: autoExpand,
+          },
+        })),
     }),
     {
       name: "fusion-preferences",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        locale: state.locale,
         articlePageSize: state.articlePageSize,
         fontSize: state.fontSize,
+        feedSort: state.feedSort,
+        feedOrder: state.feedOrder,
+        groupAutoExpand: state.groupAutoExpand,
       }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<PreferencesState> | undefined;
 
         return {
           ...currentState,
-          locale: normalizeLocale(persisted?.locale ?? currentState.locale),
           articlePageSize: normalizeArticlePageSize(
             persisted?.articlePageSize ?? currentState.articlePageSize,
           ),
           fontSize: normalizeFontSize(
             persisted?.fontSize ?? currentState.fontSize,
           ),
+          feedSort: normalizeFeedSort(
+            persisted?.feedSort ?? currentState.feedSort,
+          ),
+          feedOrder: normalizeFeedOrder(persisted?.feedOrder),
+          groupAutoExpand: normalizeGroupAutoExpand(
+            persisted?.groupAutoExpand,
+          ),
         };
       },
     },
   ),
 );
-
-export function getPreferredLocale(): AppLocale {
-  return usePreferencesStore.getState().locale;
-}

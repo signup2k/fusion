@@ -1,6 +1,5 @@
 import { toast } from "sonner";
 import { translate } from "@/lib/i18n";
-import { getPreferredLocale } from "@/store/preferences";
 
 const SW_URL = "/sw.js";
 const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
@@ -17,14 +16,12 @@ function notifyInstallAvailability(): void {
 }
 
 function showUpdateToast(registration: ServiceWorkerRegistration): void {
-  const locale = getPreferredLocale();
-
-  toast.info(translate("pwa.update.title", undefined, locale), {
+  toast.info(translate("pwa.update.title"), {
     id: "pwa-update",
-    description: translate("pwa.update.description", undefined, locale),
+    description: translate("pwa.update.description"),
     duration: Number.POSITIVE_INFINITY,
     action: {
-      label: translate("pwa.update.reload", undefined, locale),
+      label: translate("pwa.update.reload"),
       onClick: () => {
         shouldReloadOnControllerChange = true;
         if (registration.waiting) {
@@ -106,8 +103,7 @@ export function registerPWA(): void {
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     notifyInstallAvailability();
-    const locale = getPreferredLocale();
-    toast.success(translate("pwa.toast.installed", undefined, locale));
+    toast.success(translate("pwa.toast.installed"));
   });
 
   window.addEventListener("load", () => {

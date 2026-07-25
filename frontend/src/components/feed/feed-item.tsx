@@ -4,15 +4,25 @@ import { useUIStore } from "@/store";
 import { getFaviconUrl } from "@/lib/api/favicon";
 import type { Feed } from "@/lib/api";
 import { FeedFavicon } from "@/components/feed/feed-favicon";
-import { Settings } from "lucide-react";
+import { ArrowDown, ArrowUp, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 
 interface FeedItemProps {
   feed: Feed;
+  manualSorting?: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMove?: (direction: "up" | "down") => void;
 }
 
-export function FeedItem({ feed }: FeedItemProps) {
+export function FeedItem({
+  feed,
+  manualSorting = false,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMove,
+}: FeedItemProps) {
   const { t } = useI18n();
   const { selectedFeedId, setSelectedFeed } = useUrlState();
   const { setEditFeedOpen } = useUIStore();
@@ -41,10 +51,34 @@ export function FeedItem({ feed }: FeedItemProps) {
           {feed.name}
         </span>
       </button>
-      <div className="ml-2 flex h-6 shrink-0 items-center justify-center">
+      <div className="ml-1 flex h-6 shrink-0 items-center justify-center">
         <span className="text-[11px] text-muted-foreground md:group-hover:hidden md:group-focus-within:hidden">
           {feed.unread_count > 0 ? feed.unread_count : ""}
         </span>
+        {manualSorting && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
+              onClick={() => onMove?.("up")}
+              disabled={!canMoveUp}
+              aria-label={t("feed.order.moveUp")}
+            >
+              <ArrowUp className="text-muted-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
+              onClick={() => onMove?.("down")}
+              disabled={!canMoveDown}
+              aria-label={t("feed.order.moveDown")}
+            >
+              <ArrowDown className="text-muted-foreground" />
+            </Button>
+          </>
+        )}
         <Button
           variant="ghost"
           size="icon-xs"

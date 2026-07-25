@@ -1,8 +1,19 @@
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useUrlState } from "@/hooks/use-url-state";
+import { useI18n } from "@/lib/i18n";
+import { usePreferencesStore } from "@/store";
 import { FeedItem } from "./feed-item";
 import type { Feed } from "@/lib/api";
 
@@ -10,10 +21,21 @@ interface FeedGroupProps {
   groupId: number;
   name: string;
   feeds: Feed[];
+  manualSorting: boolean;
+  onMoveFeed: (feedId: number, direction: "up" | "down") => void;
 }
 
-export function FeedGroup({ groupId, name, feeds }: FeedGroupProps) {
-  const [isOpen, setIsOpen] = useState(true);
+export function FeedGroup({
+  groupId,
+  name,
+  feeds,
+  manualSorting,
+  onMoveFeed,
+}: FeedGroupProps) {
+  const { t } = useI18n();
+  const { groupAutoExpand, setGroupAutoExpand } = usePreferencesStore();
+  const autoExpand = groupAutoExpand[groupId] ?? true;
+  const [isOpen, setIsOpen] = useState(autoExpand);
   const { selectedGroupId, setSelectedGroup } = useUrlState();
   const isSelected = selectedGroupId === groupId;
 
@@ -30,7 +52,7 @@ export function FeedGroup({ groupId, name, feeds }: FeedGroupProps) {
     >
       <div
         className={cn(
-          "flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
+          "group flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
           isSelected
             ? "bg-accent text-accent-foreground"
             : "hover:bg-accent/50",
@@ -43,6 +65,11 @@ export function FeedGroup({ groupId, name, feeds }: FeedGroupProps) {
             setIsOpen(!isOpen);
           }}
           className="shrink-0 p-1 -m-1 rounded-md transition-colors hover:bg-foreground/10"
+          aria-label={
+            isOpen
+              ? t("group.expansion.collapse", { name })
+              : t("group.expansion.expand", { name })
+          }
         >
           <ChevronRight
             className={cn(
@@ -63,11 +90,48 @@ export function FeedGroup({ groupId, name, feeds }: FeedGroupProps) {
             </span>
           )}
         </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="inline-flex shrink-0 md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
+                aria-label={t("group.expansion.settings")}
+              >
+                <MoreHorizontal className="text-muted-foreground" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                {t("group.expansion.settings")}
+              </DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={autoExpand}
+                onCheckedChange={(checked) => {
+                  setGroupAutoExpand(groupId, checked);
+                  setIsOpen(checked);
+                }}
+              >
+                {t("group.expansion.auto")}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <CollapsibleContent>
         <div className="w-full min-w-0 pl-5">
-          {feeds.map((feed) => (
-            <FeedItem key={feed.id} feed={feed} />
+          {feeds.map((feed, index) => (
+            <FeedItem
+              key={feed.id}
+              feed={feed}
+              manualSorting={manualSorting}
+              canMoveUp={index > 0}
+              canMoveDown={index < feeds.length - 1}
+              onMove={(direction) => onMoveFeed(feed.id, direction)}
+            />
           ))}
         </div>
       </CollapsibleContent>

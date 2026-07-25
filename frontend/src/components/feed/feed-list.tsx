@@ -1,6 +1,15 @@
 import { useLocation } from "@tanstack/react-router";
-import { Inbox, Layers, Star } from "lucide-react";
+import { ArrowUpDown, Inbox, Layers, Star } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { isArticleFilter } from "@/lib/article-filter";
 import { useGroups } from "@/queries/groups";
 import { useFeedLookup, useUnreadCounts } from "@/queries/feeds";
@@ -8,15 +17,18 @@ import { useBookmarkLookup } from "@/queries/bookmarks";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { usePreferencesStore, type FeedSort } from "@/store";
 import { FeedGroup } from "./feed-group";
 import { FeedItem } from "./feed-item";
 
 export function FeedList() {
   const { t } = useI18n();
   const { data: groups = [], isLoading } = useGroups();
-  const { feeds, getFeedsByGroup } = useFeedLookup();
+  const { feeds } = useFeedLookup();
   const { getTotalUnreadCount } = useUnreadCounts();
   const { total: starredTotal } = useBookmarkLookup();
+  const { feedSort, feedOrder, setFeedSort, setFeedOrder } =
+    usePreferencesStore();
   const {
     selectedFeedId,
     selectedGroupId,
@@ -31,6 +43,59 @@ export function FeedList() {
     isOnHomePage && selectedFeedId === null && selectedGroupId === null;
   const totalUnread = getTotalUnreadCount();
   const starredCount = starredTotal;
+  const manualFeedOrder = [
+    ...feedOrder.filter((id) => feeds.some((feed) => feed.id === id)),
+    ...feeds
+      .map((feed) => feed.id)
+      .filter((id) => !feedOrder.includes(id)),
+  ];
+  const manualRank = new Map(manualFeedOrder.map((id, index) => [id, index]));
+  const nameCollator = new Intl.Collator(undefined, { sensitivity: "base" });
+  const sortedFeeds = [...feeds].sort((a, b) => {
+    if (feedSort === "name") {
+      return nameCollator.compare(a.name, b.name);
+    }
+    if (feedSort === "unread") {
+      return (
+        b.unread_count - a.unread_count ||
+        nameCollator.compare(a.name, b.name)
+      );
+    }
+    if (feedSort === "newest") {
+      return b.created_at - a.created_at;
+    }
+
+    return (manualRank.get(a.id) ?? 0) - (manualRank.get(b.id) ?? 0);
+  });
+
+  const moveFeed = (
+    feedId: number,
+    direction: "up" | "down",
+    siblingIds: number[],
+  ) => {
+    const currentIndex = siblingIds.indexOf(feedId);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    const targetId = siblingIds[targetIndex];
+    if (currentIndex < 0 || targetId === undefined) {
+      return;
+    }
+
+    const nextOrder = [...manualFeedOrder];
+    const feedOrderIndex = nextOrder.indexOf(feedId);
+    const targetOrderIndex = nextOrder.indexOf(targetId);
+    [nextOrder[feedOrderIndex], nextOrder[targetOrderIndex]] = [
+      nextOrder[targetOrderIndex],
+      nextOrder[feedOrderIndex],
+    ];
+    setFeedOrder(nextOrder);
+  };
+
+  const sortLabels: Record<FeedSort, string> = {
+    manual: t("feed.sort.manual"),
+    name: t("feed.sort.name"),
+    unread: t("feed.sort.unread"),
+    newest: t("feed.sort.newest"),
+  };
 
   const topFilters: Array<{
     value: "all" | "unread" | "starred";
@@ -100,12 +165,40 @@ export function FeedList() {
           <span className="text-[11px] font-medium text-muted-foreground">
             {t("search.group.feeds")}
           </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={t("feed.sort.label")}
+                >
+                  <ArrowUpDown className="text-muted-foreground" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={feedSort}
+                onValueChange={(value) => setFeedSort(value)}
+              >
+                <DropdownMenuLabel>{t("feed.sort.label")}</DropdownMenuLabel>
+                {Object.entries(sortLabels).map(([value, label]) => (
+                  <DropdownMenuRadioItem key={value} value={value}>
+                    {label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Feed groups */}
         <div className="w-full min-w-0 space-y-0.5">
           {groups.map((group) => {
-            const groupFeeds = getFeedsByGroup(group.id);
+            const groupFeeds = sortedFeeds.filter(
+              (feed) => feed.group_id === group.id,
+            );
 
             return (
               <FeedGroup
@@ -113,15 +206,36 @@ export function FeedList() {
                 groupId={group.id}
                 name={group.name}
                 feeds={groupFeeds}
+                manualSorting={feedSort === "manual"}
+                onMoveFeed={(feedId, direction) =>
+                  moveFeed(
+                    feedId,
+                    direction,
+                    groupFeeds.map((feed) => feed.id),
+                  )
+                }
               />
             );
           })}
 
           {/* Ungrouped feeds (group_id = 0) */}
-          {feeds
+          {sortedFeeds
             .filter((f) => f.group_id === 0)
-            .map((feed) => (
-              <FeedItem key={feed.id} feed={feed} />
+            .map((feed, index, ungroupedFeeds) => (
+              <FeedItem
+                key={feed.id}
+                feed={feed}
+                manualSorting={feedSort === "manual"}
+                canMoveUp={index > 0}
+                canMoveDown={index < ungroupedFeeds.length - 1}
+                onMove={(direction) =>
+                  moveFeed(
+                    feed.id,
+                    direction,
+                    ungroupedFeeds.map((item) => item.id),
+                  )
+                }
+              />
             ))}
         </div>
       </div>

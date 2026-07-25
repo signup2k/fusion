@@ -6,7 +6,6 @@ import { ThemeProvider } from "next-themes";
 import { routeTree } from "./routeTree.gen";
 import { Toaster } from "@/components/ui/sonner";
 import { setUnauthorizedCallback } from "@/lib/api";
-import { preloadLocaleMessages } from "@/lib/i18n";
 import { queryClient } from "@/lib/query-client";
 import { registerPWA } from "@/lib/pwa";
 import { usePreferencesStore } from "@/store";
@@ -21,13 +20,10 @@ setUnauthorizedCallback(() => {
 });
 
 const initialPreferences = usePreferencesStore.getState();
-document.documentElement.lang = initialPreferences.locale;
+document.documentElement.lang = "zh-CN";
 document.documentElement.dataset.fontSize = initialPreferences.fontSize;
-void preloadLocaleMessages(initialPreferences.locale);
 usePreferencesStore.subscribe((state) => {
-  document.documentElement.lang = state.locale;
   document.documentElement.dataset.fontSize = state.fontSize;
-  void preloadLocaleMessages(state.locale);
 });
 
 // Register the router instance for type safety
