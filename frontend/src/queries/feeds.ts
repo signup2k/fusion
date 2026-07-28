@@ -114,6 +114,26 @@ export function useDeleteFeed() {
   });
 }
 
+export function useDeleteFeeds() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      await Promise.all(ids.map((id) => feedAPI.delete(id)));
+      return ids;
+    },
+    onSuccess: (ids) => {
+      const deletedIds = new Set(ids);
+      qc.setQueryData(queryKeys.feeds.list(), (old: Feed[] | undefined) =>
+        old?.filter((feed) => !deletedIds.has(feed.id)),
+      );
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.feeds.all });
+      qc.invalidateQueries({ queryKey: queryKeys.items.all });
+    },
+  });
+}
+
 export function useRefreshFeeds() {
   const qc = useQueryClient();
   return useMutation({

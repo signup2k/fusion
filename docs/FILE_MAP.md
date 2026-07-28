@@ -261,6 +261,18 @@ Structure:
 - `moveFeed` (near L72): swaps adjacent sibling IDs in the persisted global manual-order list.
 - `moveGroup` (near L111): swaps adjacent folder IDs in the persisted folder-order list.
 Depends on: group/feed/bookmark queries, URL state, preferences store, `FeedGroup`, `FeedItem`.
+
+### frontend/src/routes/feeds.lazy.tsx (~570 lines, TSX, map-updated 2026-07-28)
+
+Purpose: Manages subscriptions and folders, including filtering, creation entry points, refresh/export actions, and batch feed deletion.
+Structure:
+
+- toolbar (near L350): opens add dialogs and toggles batch-selection mode.
+- batch deletion (near L250/L550): selects visible feeds, confirms destructive deletion, and reports the result.
+
+### frontend/src/components/feed/feed-group-card.tsx (~330 lines, TSX, map-updated 2026-07-28)
+
+Purpose: Renders one folder and its subscription rows, including selection controls used by batch deletion.
 Gotchas: Feed moves are constrained to siblings in the same folder; new feeds and folders append after saved manual orders.
 
 ### frontend/src/components/feed/feed-group.tsx (~166 lines, TSX, map-updated 2026-07-25)

@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Rss,
   Search,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ import { cn } from "@/lib/utils";
 import {
   useFeedLookup,
   useCheckFeed,
+  useDeleteFeeds,
   useMoveFeedsToGroup,
   useRefreshFeed,
   useRefreshFeeds,
@@ -65,6 +67,7 @@ function FeedsPage() {
   const refreshFeedsMutation = useRefreshFeeds();
   const refreshFeedMutation = useRefreshFeed();
   const checkFeedMutation = useCheckFeed();
+  const deleteFeedsMutation = useDeleteFeeds();
 
   const {
     setEditFeedOpen,
@@ -87,6 +90,11 @@ function FeedsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const [isSelectingFeeds, setIsSelectingFeeds] = useState(false);
+  const [selectedFeedIds, setSelectedFeedIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
   const [mobileErrorTooltipFeedId, setMobileErrorTooltipFeedId] = useState<
     number | null
   >(null);
@@ -243,6 +251,55 @@ function FeedsPage() {
 
   const totalVisible = groupedFeeds.reduce((sum, g) => sum + g.feeds.length, 0);
   const hasNoFeeds = !isFeedsLoading && feeds.length === 0;
+  const visibleFeedIds = useMemo(
+    () =>
+      groupedFeeds.flatMap(({ feeds: groupFeeds }) =>
+        groupFeeds.map((feed) => feed.id),
+      ),
+    [groupedFeeds],
+  );
+  const allVisibleSelected =
+    visibleFeedIds.length > 0 &&
+    visibleFeedIds.every((feedId) => selectedFeedIds.has(feedId));
+
+  const toggleFeedSelection = (feedId: number) => {
+    setSelectedFeedIds((current) => {
+      const next = new Set(current);
+      if (next.has(feedId)) next.delete(feedId);
+      else next.add(feedId);
+      return next;
+    });
+  };
+
+  const toggleAllVisibleFeeds = () => {
+    setSelectedFeedIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) {
+        visibleFeedIds.forEach((feedId) => next.delete(feedId));
+      } else {
+        visibleFeedIds.forEach((feedId) => next.add(feedId));
+      }
+      return next;
+    });
+  };
+
+  const exitFeedSelection = () => {
+    setIsSelectingFeeds(false);
+    setSelectedFeedIds(new Set());
+  };
+
+  const confirmBatchDelete = async () => {
+    const ids = [...selectedFeedIds];
+    if (ids.length === 0) return;
+    try {
+      await deleteFeedsMutation.mutateAsync(ids);
+      toast.success(t("feeds.batchDelete.success", { count: ids.length }));
+      setBatchDeleteConfirmOpen(false);
+      exitFeedSelection();
+    } catch {
+      toast.error(t("feeds.batchDelete.failed"));
+    }
+  };
   const deletingGroupMoveHint = useMemo(() => {
     if (!deletingGroup) {
       return "";
@@ -311,7 +368,7 @@ function FeedsPage() {
                   (key) => (
                     <DropdownMenuItem
                       key={key}
-                      onSelect={() => setStatusFilter(key)}
+                      onClick={() => setStatusFilter(key)}
                     >
                       {statusFilterLabels[key]}
                     </DropdownMenuItem>
@@ -332,16 +389,55 @@ function FeedsPage() {
                 }
               />
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setAddFeedOpen(true)}>
+                <DropdownMenuItem onClick={() => setAddFeedOpen(true)}>
                   <Rss className="mr-2 h-4 w-4" />
                   {t("feed.add.title")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setAddGroupOpen(true)}>
+                <DropdownMenuItem onClick={() => setAddGroupOpen(true)}>
                   <Folder className="mr-2 h-4 w-4" />
                   {t("group.add.title")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {isSelectingFeeds ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleAllVisibleFeeds}
+                >
+                  {allVisibleSelected
+                    ? t("feeds.batchDelete.clearVisible")
+                    : t("feeds.batchDelete.selectVisible")}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedFeedIds.size === 0}
+                  onClick={() => setBatchDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5 sm:mr-1.5" />
+                  {t("feeds.batchDelete.deleteSelected", {
+                    count: selectedFeedIds.size,
+                  })}
+                </Button>
+                <Button variant="outline" size="sm" onClick={exitFeedSelection}>
+                  {t("common.cancel")}
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={feeds.length === 0}
+                onClick={() => setIsSelectingFeeds(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">
+                  {t("feeds.batchDelete.start")}
+                </span>
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -412,6 +508,9 @@ function FeedsPage() {
                       onOpenEditFeed={(feed) => setEditFeedOpen(true, feed)}
                       onRefreshFeed={(feed) => void handleRefreshFeed(feed)}
                       onCheckFeed={(feed) => void handleCheckFeed(feed)}
+                      isSelecting={isSelectingFeeds}
+                      selectedFeedIds={selectedFeedIds}
+                      onToggleFeedSelection={toggleFeedSelection}
                       refreshingFeedId={
                         refreshFeedMutation.isPending
                           ? (refreshFeedMutation.variables ?? null)
@@ -502,6 +601,40 @@ function FeedsPage() {
               }}
             >
               {t("common.refresh")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={batchDeleteConfirmOpen}
+        onOpenChange={setBatchDeleteConfirmOpen}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{t("feeds.batchDelete.title")}</DialogTitle>
+            <DialogDescription>
+              {t("feeds.batchDelete.description", {
+                count: selectedFeedIds.size,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchDeleteConfirmOpen(false)}
+              disabled={deleteFeedsMutation.isPending}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void confirmBatchDelete()}
+              disabled={deleteFeedsMutation.isPending}
+            >
+              {deleteFeedsMutation.isPending
+                ? t("common.deleting")
+                : t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

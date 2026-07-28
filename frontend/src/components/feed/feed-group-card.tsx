@@ -31,6 +31,9 @@ interface FeedGroupCardProps {
   onOpenEditFeed: (feed: Feed) => void;
   onRefreshFeed: (feed: Feed) => void;
   onCheckFeed: (feed: Feed) => void;
+  isSelecting: boolean;
+  selectedFeedIds: Set<number>;
+  onToggleFeedSelection: (feedId: number) => void;
   refreshingFeedId: number | null;
   checkingFeedId: number | null;
   onChangeMobileErrorTooltipFeedId: Dispatch<SetStateAction<number | null>>;
@@ -63,6 +66,9 @@ export function FeedGroupCard({
   onOpenEditFeed,
   onRefreshFeed,
   onCheckFeed,
+  isSelecting,
+  selectedFeedIds,
+  onToggleFeedSelection,
   refreshingFeedId,
   checkingFeedId,
   onChangeMobileErrorTooltipFeedId,
@@ -201,6 +207,17 @@ export function FeedGroupCard({
               )}
             >
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                {isSelecting && (
+                  <input
+                    type="checkbox"
+                    checked={selectedFeedIds.has(feed.id)}
+                    onChange={() => onToggleFeedSelection(feed.id)}
+                    aria-label={t("feeds.batchDelete.selectFeed", {
+                      name: feed.name,
+                    })}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                  />
+                )}
                 <FeedFavicon
                   src={getFaviconUrl(feed.link, feed.site_url)}
                   className="h-5 w-5"
@@ -212,9 +229,10 @@ export function FeedGroupCard({
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-                {feed.fetch_state.last_error && (
-                  <Tooltip
+              {!isSelecting && (
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+                  {feed.fetch_state.last_error && (
+                    <Tooltip
                     open={
                       isMobile
                         ? mobileErrorTooltipFeedId === feed.id
@@ -253,12 +271,12 @@ export function FeedGroupCard({
                     >
                       {feed.fetch_state.last_error.trim()}
                     </TooltipContent>
-                  </Tooltip>
-                )}
-                {feed.suspended && (
-                  <Pause className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                )}
-                <span className="hidden text-xs text-muted-foreground sm:inline">
+                    </Tooltip>
+                  )}
+                  {feed.suspended && (
+                    <Pause className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="hidden text-xs text-muted-foreground sm:inline">
                   {t("feeds.itemCount", {
                     count: feed.item_count,
                   })}{" "}
@@ -266,8 +284,8 @@ export function FeedGroupCard({
                   {feed.fetch_state.last_checked_at > 0
                     ? formatDate(feed.fetch_state.last_checked_at)
                     : t("common.unknown")}
-                </span>
-                <button
+                  </span>
+                  <button
                   type="button"
                   onClick={() => onCheckFeed(feed)}
                   disabled={checkingFeedId === feed.id}
@@ -281,8 +299,8 @@ export function FeedGroupCard({
                       checkingFeedId === feed.id && "animate-pulse",
                     )}
                   />
-                </button>
-                <button
+                  </button>
+                  <button
                   type="button"
                   onClick={() => onRefreshFeed(feed)}
                   disabled={refreshingFeedId === feed.id}
@@ -296,16 +314,17 @@ export function FeedGroupCard({
                       refreshingFeedId === feed.id && "animate-spin",
                     )}
                   />
-                </button>
-                <button
+                  </button>
+                  <button
                   type="button"
                   onClick={() => onOpenEditFeed(feed)}
                   className="rounded p-1 hover:bg-accent"
                   aria-label={t("feed.edit.title")}
                 >
                   <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-              </div>
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
