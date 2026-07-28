@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Circle, CircleCheck, Star, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -8,7 +9,7 @@ import { toSafeExternalUrl } from "@/lib/safe-url";
 
 interface ArticleItemProps {
   article: Item;
-  selectedArticleId: number | null;
+  isSelected: boolean;
   onSelectArticle: (articleId: number | null) => void;
   onToggleRead: (article: Item) => Promise<void>;
   onToggleStar: (article: Item) => Promise<void>;
@@ -18,9 +19,9 @@ interface ArticleItemProps {
   feedFaviconUrl: string | null;
 }
 
-export function ArticleItem({
+export const ArticleItem = memo(function ArticleItem({
   article,
-  selectedArticleId,
+  isSelected,
   onSelectArticle,
   onToggleRead,
   onToggleStar,
@@ -31,8 +32,11 @@ export function ArticleItem({
 }: ArticleItemProps) {
   const { t } = useI18n();
 
-  const isSelected = selectedArticleId === article.id;
   const safeArticleLink = toSafeExternalUrl(article.link);
+  const summary = useMemo(
+    () => extractSummary(article.content, 150),
+    [article.content],
+  );
 
   const handleToggleRead = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -81,7 +85,7 @@ export function ArticleItem({
           {article.title}
         </h3>
         <p className="line-clamp-2 text-sm text-muted-foreground">
-          {extractSummary(article.content, 150)}
+          {summary}
         </p>
         <div className="flex items-center gap-2 text-xs">
           <FeedFavicon src={feedFaviconUrl} className="h-3.5 w-3.5 rounded-sm" />
@@ -171,4 +175,4 @@ export function ArticleItem({
       </div>
     </div>
   );
-}
+});

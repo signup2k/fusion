@@ -7,7 +7,7 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -44,19 +44,23 @@ export function ArticleDrawer() {
   } = useUrlState();
   const { getFeedById } = useFeedLookup();
 
-  const { articles, isStarredMode, isItemStarred, getBookmarkByItemId } =
-    useArticleList({
-      feedId: selectedFeedId,
-      groupId: selectedGroupId,
-      articleFilter,
-    });
+  const {
+    cachedArticles: articles,
+    isStarredMode,
+    isItemStarred,
+    getBookmarkByItemId,
+  } = useArticleList({
+    feedId: selectedFeedId,
+    groupId: selectedGroupId,
+    articleFilter,
+  });
 
   const markRead = useMarkItemsRead();
   const markUnread = useMarkItemsUnread();
   const createBookmark = useCreateBookmark();
   const deleteBookmark = useDeleteBookmark();
 
-  const articleIds = articles.map((a) => a.id);
+  const articleIds = useMemo(() => articles.map((a) => a.id), [articles]);
 
   const storeArticle = selectedArticleId
     ? (articles.find((i) => i.id === selectedArticleId) ?? null)
@@ -80,6 +84,17 @@ export function ArticleDrawer() {
   const bookmark = article ? getBookmarkByItemId(article.id) : null;
   const starred = article ? isItemStarred(article.id) : false;
   const safeArticleLink = article ? toSafeExternalUrl(article.link) : null;
+  const articleContent = article?.content ?? "";
+  const processedArticleContent = useMemo(
+    () =>
+      articleContent
+        ? processArticleContent(
+            articleContent,
+            safeArticleLink ?? undefined,
+          )
+        : "",
+    [articleContent, safeArticleLink],
+  );
 
   useEffect(() => {
     if (selectedArticleId === null) {
@@ -124,11 +139,18 @@ export function ArticleDrawer() {
   };
 
   const handleToggleStar = async () => {
-    if (!article) return;
+    if (
+      !article ||
+      createBookmark.isPending ||
+      deleteBookmark.isPending
+    ) {
+      return;
+    }
+
     try {
       if (starred) {
         const bookmark = getBookmarkByItemId(article.id);
-        if (bookmark) {
+        if (bookmark && bookmark.id > 0) {
           await deleteBookmark.mutateAsync(bookmark.id);
         }
       } else {
@@ -201,6 +223,9 @@ export function ArticleDrawer() {
                   variant="outline"
                   size="sm"
                   onClick={handleToggleStar}
+                  disabled={
+                    createBookmark.isPending || deleteBookmark.isPending
+                  }
                   className="h-auto gap-1.5 px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground"
                 >
                   <Star
@@ -291,10 +316,7 @@ export function ArticleDrawer() {
                 <div
                   className="typeset typeset-article mt-6 min-w-0 max-w-none"
                   dangerouslySetInnerHTML={{
-                    __html: processArticleContent(
-                      article.content,
-                      safeArticleLink ?? undefined,
-                    ),
+                    __html: processedArticleContent,
                   }}
                 />
               </article>

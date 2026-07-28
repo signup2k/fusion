@@ -125,14 +125,16 @@ export interface FeedCheckResponse {
   error?: string;
 }
 
-export interface CreateBookmarkRequest {
-  item_id?: number;
-  link: string;
-  title: string;
-  content: string;
-  pub_date: number;
-  feed_name: string;
-}
+export type CreateBookmarkRequest =
+  | { item_id: number }
+  | {
+      item_id?: never;
+      link: string;
+      title: string;
+      content: string;
+      pub_date: number;
+      feed_name: string;
+    };
 
 export interface MarkItemsReadRequest {
   ids: number[];

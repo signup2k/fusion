@@ -21,6 +21,8 @@ import { usePreferencesStore, type FeedSort } from "@/store";
 import { FeedGroup } from "./feed-group";
 import { FeedItem } from "./feed-item";
 
+const feedNameCollator = new Intl.Collator(undefined, { sensitivity: "base" });
+
 export function FeedList() {
   const { t } = useI18n();
   const { data: groups = [], isLoading } = useGroups();
@@ -68,15 +70,14 @@ export function FeedList() {
       .filter((id) => !feedOrder.includes(id)),
   ];
   const manualRank = new Map(manualFeedOrder.map((id, index) => [id, index]));
-  const nameCollator = new Intl.Collator(undefined, { sensitivity: "base" });
   const sortedFeeds = [...feeds].sort((a, b) => {
     if (feedSort === "name") {
-      return nameCollator.compare(a.name, b.name);
+      return feedNameCollator.compare(a.name, b.name);
     }
     if (feedSort === "unread") {
       return (
         b.unread_count - a.unread_count ||
-        nameCollator.compare(a.name, b.name)
+        feedNameCollator.compare(a.name, b.name)
       );
     }
     if (feedSort === "newest") {

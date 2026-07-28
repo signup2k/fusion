@@ -238,7 +238,10 @@ func (s *Store) batchUpdateItemsUnreadChunk(ids []int64, unread bool) error {
 		args = append(args, sql.Named(paramName, id))
 	}
 
-	query := fmt.Sprintf(`UPDATE items SET unread = :unread WHERE id IN (%s)`, strings.Join(placeholders, ","))
+	query := fmt.Sprintf(
+		`UPDATE items SET unread = :unread WHERE unread <> :unread AND id IN (%s)`,
+		strings.Join(placeholders, ","),
+	)
 	_, err := s.db.Exec(query, args...)
 	return err
 }

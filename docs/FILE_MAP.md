@@ -3,7 +3,7 @@
 > Per-file index for AI agents. Read the relevant entry BEFORE opening a file;
 > read only the line ranges the entry points to. Update entries after structural
 > changes (see the repo-map skill).
-> Last partial audit: 2026-07-25 | Files mapped: 47
+> Last partial audit: 2026-07-28 | Files mapped: 47
 
 ## Project documentation
 
@@ -81,6 +81,10 @@ Structure:
 - `bookmarks` (L78): stores title/content snapshots separately from items.
 Gotchas: Adding translated searchable fields requires updating the FTS table and triggers.
 
+### backend/internal/store/migrations/004_limit_items_fts_update_trigger.sql (~8 lines, SQL, map-updated 2026-07-28)
+
+Purpose: Restricts the item FTS update trigger to title/content changes so unread-only updates do not rebuild full-text rows.
+
 ### backend/internal/store/migrate.go (~143 lines, Go, map-updated 2026-07-16)
 
 Purpose: Applies embedded, versioned SQL migrations transactionally at startup.
@@ -90,13 +94,14 @@ Structure:
 - `applyMigration` (L110): executes migration SQL and records its version atomically.
 Depends on: `backend/internal/store/migrations/*.sql`, SQLite store.
 
-### backend/internal/store/item.go (~508 lines, Go, map-updated 2026-07-16)
+### backend/internal/store/item.go (~511 lines, Go, map-updated 2026-07-28)
 
 Purpose: Owns item CRUD, pagination, unread state, Fever item queries, and item search.
 Structure:
 
 - `ListItems` (L29) / `GetItem` (L96): select the complete item API model.
 - `CreateItem` (L113) / `BatchCreateItemsIgnore` (L141): insert fetched items.
+- `BatchUpdateItemsUnread` (L208): updates read state in bounded chunks and skips rows already at the target state.
 - `ListFeverItems` (L331): returns items for third-party Fever clients.
 - `SearchItems` (L411): searches the FTS index with a LIKE fallback.
 Gotchas: Item column changes require coordinated SELECT/Scan updates in several methods.
@@ -188,32 +193,32 @@ Gotchas: A durable asynchronous translator would need another lifecycle-managed 
 
 ## Frontend item display
 
-### frontend/src/queries/items.ts (~260 lines, TypeScript, map-updated 2026-07-22)
+### frontend/src/queries/items.ts (~279 lines, TypeScript, map-updated 2026-07-28)
 
 Purpose: Defines item list/detail queries and optimistic read-state mutations across item, feed, and bookmark caches.
 Structure:
 
-- `itemQueries` (L45): builds paginated list and detail query options.
-- `applyOptimisticItemReadState` (L96): mirrors read-state changes into loaded article, detail, feed-count, and bookmark caches.
-- `useSetItemsReadState` (L219): performs read/unread mutations, rolls back failures, and invalidates article lists plus feed data for server reconciliation.
-Gotchas: Filtered unread lists require post-mutation invalidation because changing an item's field alone does not remove it from an already cached page.
+- `itemQueries` (L50): builds paginated list and detail query options.
+- `applyOptimisticItemReadState` (L103): mirrors read-state changes into loaded article, detail, feed-count, and bookmark caches while deduplicating per-item count changes.
+- `useSetItemsReadState` (L244): performs read/unread mutations with rollback and no post-success refetch.
+Gotchas: Unread-mode visibility is filtered from the optimistic item state by `useArticleList`; the cached source sequence remains intact for drawer navigation.
 
-### frontend/src/hooks/use-article-list.ts (~84 lines, TypeScript, map-updated 2026-07-22)
+### frontend/src/hooks/use-article-list.ts (~92 lines, TypeScript, map-updated 2026-07-28)
 
 Purpose: Selects and normalizes the paginated article source for all, unread, and starred list modes.
 Structure:
 
-- `useArticleList` (L16): routes all/unread modes to item queries and starred mode to bookmark queries, returning one article-list contract.
+- `useArticleList` (L17): routes item/bookmark queries, filters optimistic read items from unread lists, and exposes the unfiltered cached sequence for drawer navigation.
 Depends on: item queries, bookmark queries, article filter types.
 
-### frontend/src/components/article/article-list.tsx (~239 lines, TSX, map-updated 2026-07-22)
+### frontend/src/components/article/article-list.tsx (~260 lines, TSX, map-updated 2026-07-28)
 
 Purpose: Renders the article list header, filter tabs, pagination, and read/star actions.
 Structure:
 
 - `ArticleList` (L22): derives URL scope, loads articles, and wires list interactions.
-- `handleMarkAllAsRead` (L108): marks every currently loaded unread article in the active scope as read.
-Gotchas: “Mark all as read” applies to loaded pages only; query mutation invalidation owns the subsequent list refresh.
+- `handleMarkAllAsRead` (L128): marks every currently loaded unread article in the active scope as read.
+Gotchas: “Mark all as read” applies to loaded pages only; optimistic cache state owns the immediate list and count update.
 
 ### frontend/src/queries/keys.ts (~63 lines, TypeScript, map-updated 2026-07-22)
 
@@ -254,12 +259,13 @@ Structure:
 - `SettingsDialog` (L286): owns responsive tab navigation and dialog layout.
 Depends on: persisted preference/UI stores, theme provider, Chinese message lookup, PWA install hook.
 
-### frontend/src/components/feed/feed-list.tsx (~280 lines, TSX, map-updated 2026-07-25)
+### frontend/src/components/feed/feed-list.tsx (~281 lines, TSX, map-updated 2026-07-28)
 
 Purpose: Renders the navigation sidebar filters, manually ordered folders, feeds, and persisted feed-sort controls.
 Structure:
 
-- `FeedList` (L24): sorts feeds by manual position, name, unread count, or creation time and renders group/ungrouped sections.
+- module-level collator (L24): reuses locale comparison state across sidebar renders.
+- `FeedList` (L26): sorts feeds by manual position, name, unread count, or creation time and renders group/ungrouped sections.
 - `moveFeed` (near L72): swaps adjacent sibling IDs in the persisted global manual-order list.
 - `moveGroup` (near L111): swaps adjacent folder IDs in the persisted folder-order list.
 Depends on: group/feed/bookmark queries, URL state, preferences store, `FeedGroup`, `FeedItem`.
@@ -320,7 +326,7 @@ Purpose: Exports the sole Simplified Chinese dictionary and its compile-time key
 
 Purpose: Canonical and only UI dictionary; its keys define the compile-time `TranslationKey` union.
 
-### frontend/src/lib/api/types.ts (~198 lines, TypeScript, map-updated 2026-07-18)
+### frontend/src/lib/api/types.ts (~200 lines, TypeScript, map-updated 2026-07-28)
 
 Purpose: Defines frontend request, response, and domain types matching the backend JSON API.
 Structure:
@@ -328,6 +334,7 @@ Structure:
 - `Item` (L31): mirrors the backend item with title and content.
 - `Bookmark` (L43): mirrors saved title/content snapshots.
 - `FeedCheckResponse` (L119): describes a read-only single-feed health check.
+- `CreateBookmarkRequest` (L128): models either an item-ID reference or a complete orphan snapshot.
 - `SearchItem` (L173): compact search result type.
 
 ### frontend/src/lib/api/index.ts (~141 lines, TypeScript, map-updated 2026-07-18)
@@ -337,30 +344,32 @@ Structure:
 
 - `feedAPI` (L59): feed CRUD, discovery, batch creation, refresh-all, refresh-one, and check-one requests.
 
-### frontend/src/components/article/article-item.tsx (~174 lines, TSX, map-updated 2026-07-16)
+### frontend/src/components/article/article-item.tsx (~178 lines, TSX, map-updated 2026-07-28)
 
 Purpose: Renders one article row in the list with title, extracted summary, metadata, and actions.
 Structure:
 
-- `ArticleItem` (L21): displays `article.title` and `extractSummary(article.content, 150)`.
+- `ArticleItem` (L22): memoized article row that caches plain-text summary extraction by content.
 Depends on: API `Item`, summary utility, feed favicon, i18n.
 
-### frontend/src/components/article/article-drawer.tsx (~331 lines, TSX, map-updated 2026-07-19)
+### frontend/src/components/article/article-drawer.tsx (~353 lines, TSX, map-updated 2026-07-28)
 
 Purpose: Renders the selected article's detailed reading drawer and navigation.
 Structure:
 
-- `ArticleDrawer` (near L50): resolves item/bookmark context and action state.
-- title/content rendering (L232–L301): displays title and sanitized full HTML content.
+- `ArticleDrawer` (L35): resolves item/bookmark context and action state from the stable cached sequence.
+- processed content memo (near L88): sanitizes full HTML only when article content/link changes.
+- title/content rendering (near L265–L322): displays title and memoized sanitized HTML.
 Gotchas: The reading `ScrollArea` is keyed by article ID so article navigation always starts at the top.
 
-### frontend/src/lib/utils.ts (~73 lines, TypeScript, map-updated 2026-07-16)
+### frontend/src/lib/utils.ts (~73 lines, TypeScript, map-updated 2026-07-28)
 
 Purpose: Provides styling, date formatting, and plain-text summary extraction helpers.
 Structure:
 
-- `extractSummary` (L64): strips HTML and truncates content client-side.
-Gotchas: Summary text is derived at render time and is not present in the API or database.
+- module-level formatters (near L6): reuse locale formatter instances across list rows.
+- `extractSummary` (L65): strips HTML and truncates content client-side.
+Gotchas: Summary text is derived client-side but memoized by each article row.
 
 ## Frontend data queries
 
@@ -386,23 +395,25 @@ Structure:
 
 - `FeedsPage` (L58): coordinates feed mutations and shows localized result toasts.
 
-### frontend/src/queries/items.ts (~257 lines, TypeScript, map-updated 2026-07-16)
+### frontend/src/queries/items.ts (~279 lines, TypeScript, map-updated 2026-07-28)
 
 Purpose: Owns item list/detail queries and optimistic unread-state cache updates.
 Structure:
 
-- `itemQueries` (L43): defines paginated list and item detail requests.
-- `useItems` / `useItem` (L62): public item query hooks.
-- optimistic cache helpers (L79 onward): update item and bookmark caches together.
+- `itemQueries` (L50): defines paginated list and item detail requests.
+- `useItems` / `useItem` (L72): public item query hooks.
+- optimistic cache helpers (L84 onward): update item, feed-count, and bookmark caches together without immediate refetch.
 
-### frontend/src/queries/bookmarks.ts (~236 lines, TypeScript, map-updated 2026-07-16)
+### frontend/src/queries/bookmarks.ts (~295 lines, TypeScript, map-updated 2026-07-28)
 
 Purpose: Owns bookmark pagination, lookup, and conversion into article-list items.
 Structure:
 
 - `useBookmarkLookup` (L55): powers star state and bookmark lookup.
 - `useStarredItems` (L105): returns bookmarks presented through the `Item` UI shape.
-Gotchas: Orphaned bookmark snapshots cannot inherit later item translations unless translations are also snapshotted.
+- optimistic cache helpers (near L150): upsert/remove bookmarks across loaded pages with snapshot rollback.
+- `useCreateBookmark` / `useDeleteBookmark` (L229/L271): provide immediate star feedback, send compact item-ID create requests, and mark caches stale without active refetch.
+Gotchas: Filtered bookmark caches are reconciled on their next mount rather than immediately refetched after each mutation.
 
 ### frontend/src/components/search/search-dialog.tsx (~225 lines, TSX, map-updated 2026-07-16)
 

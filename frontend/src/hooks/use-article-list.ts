@@ -42,7 +42,14 @@ export function useArticleList(filters: ArticleListFilters) {
     [itemsQuery.data],
   );
 
-  const articles: Item[] = isStarredMode ? starred.items : items;
+  const cachedArticles: Item[] = isStarredMode ? starred.items : items;
+  const articles = useMemo(
+    () =>
+      !isStarredMode && filters.articleFilter === "unread"
+        ? cachedArticles.filter((item) => item.unread)
+        : cachedArticles,
+    [cachedArticles, filters.articleFilter, isStarredMode],
+  );
 
   // Bookmark resolution for star state + un-starring. In starred mode every
   // displayed article is itself a bookmark, so resolve from the starred data
@@ -69,6 +76,7 @@ export function useArticleList(filters: ArticleListFilters) {
 
   return {
     articles,
+    cachedArticles,
     hasMore: isStarredMode ? starred.hasNextPage : itemsQuery.hasNextPage,
     isLoading: isStarredMode ? starred.isLoading : itemsQuery.isLoading,
     isLoadingMore: isStarredMode

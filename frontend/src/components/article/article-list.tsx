@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,18 @@ export function ArticleList() {
   const markItemsUnread = useMarkItemsUnread();
   const createBookmark = useCreateBookmark();
   const deleteBookmark = useDeleteBookmark();
+  const markItemsReadAsync = markItemsRead.mutateAsync;
+  const markItemsUnreadAsync = markItemsUnread.mutateAsync;
+  const createBookmarkAsync = createBookmark.mutateAsync;
+  const deleteBookmarkAsync = deleteBookmark.mutateAsync;
+  const setSelectedArticleRef = useRef(setSelectedArticle);
+  useEffect(() => {
+    setSelectedArticleRef.current = setSelectedArticle;
+  }, [setSelectedArticle]);
+  const selectArticle = useCallback(
+    (articleId: number | null) => setSelectedArticleRef.current(articleId),
+    [],
+  );
 
   const articleIds = articles.map((a) => a.id);
   useArticleNavigation(articleIds, {
@@ -74,34 +86,43 @@ export function ArticleList() {
 
       try {
         if (article.unread) {
-          await markItemsRead.mutateAsync([article.id]);
+          await markItemsReadAsync([article.id]);
         } else {
-          await markItemsUnread.mutateAsync([article.id]);
+          await markItemsUnreadAsync([article.id]);
         }
       } catch (error) {
         console.error("Failed to toggle read status:", error);
       }
     },
-    [markItemsRead, markItemsUnread],
+    [markItemsReadAsync, markItemsUnreadAsync],
   );
 
   const handleToggleStar = useCallback(
     async (article: Item) => {
+      if (createBookmark.isPending || deleteBookmark.isPending) return;
+
       try {
         if (isItemStarred(article.id)) {
           const bookmark = getBookmarkByItemId(article.id);
-          if (bookmark) {
-            await deleteBookmark.mutateAsync(bookmark.id);
+          if (bookmark && bookmark.id > 0) {
+            await deleteBookmarkAsync(bookmark.id);
           }
           return;
         }
 
-        await createBookmark.mutateAsync(article);
+        await createBookmarkAsync(article);
       } catch (error) {
         console.error("Failed to toggle star:", error);
       }
     },
-    [createBookmark, deleteBookmark, getBookmarkByItemId, isItemStarred],
+    [
+      createBookmarkAsync,
+      createBookmark.isPending,
+      deleteBookmarkAsync,
+      deleteBookmark.isPending,
+      getBookmarkByItemId,
+      isItemStarred,
+    ],
   );
 
   const handleMarkAllAsRead = async () => {
@@ -112,7 +133,7 @@ export function ArticleList() {
     if (unreadIds.length === 0) return;
 
     try {
-      await markItemsRead.mutateAsync(unreadIds);
+      await markItemsReadAsync(unreadIds);
     } catch (error) {
       console.error("Failed to mark all as read:", error);
     }
@@ -198,8 +219,8 @@ export function ArticleList() {
                     <ArticleItem
                       key={article.id}
                       article={article}
-                      selectedArticleId={selectedArticleId}
-                      onSelectArticle={setSelectedArticle}
+                      isSelected={selectedArticleId === article.id}
+                      onSelectArticle={selectArticle}
                       onToggleRead={handleToggleRead}
                       onToggleStar={handleToggleStar}
                       canToggleRead={article.id > 0}

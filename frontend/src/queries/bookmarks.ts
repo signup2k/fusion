@@ -4,6 +4,7 @@ import {
   useMutation,
   useQueryClient,
   type InfiniteData,
+  type QueryClient,
 } from "@tanstack/react-query";
 import {
   bookmarkAPI,
@@ -147,56 +148,122 @@ export function useStarredItems(
   };
 }
 
+interface BookmarkMutationContext {
+  previousLists: Array<
+    [readonly unknown[], BookmarksInfiniteData | undefined]
+  >;
+}
+
+function snapshotBookmarkLists(qc: QueryClient) {
+  return {
+    previousLists: qc.getQueriesData<BookmarksInfiniteData>({
+      queryKey: queryKeys.bookmarks.lists(),
+    }),
+  } satisfies BookmarkMutationContext;
+}
+
+function restoreBookmarkLists(
+  qc: QueryClient,
+  context: BookmarkMutationContext | undefined,
+) {
+  if (!context) return;
+  for (const [key, data] of context.previousLists) {
+    qc.setQueryData(key, data);
+  }
+}
+
+function upsertBookmarkInCaches(qc: QueryClient, bookmark: Bookmark) {
+  const itemId = resolveBookmarkItemId(bookmark);
+  qc.setQueriesData<BookmarksInfiniteData>(
+    { queryKey: queryKeys.bookmarks.lists() },
+    (old) => {
+      if (!old || old.pages.length === 0) return old;
+
+      const exists = old.pages.some((page) =>
+        page.data.some((entry) => resolveBookmarkItemId(entry) === itemId),
+      );
+      const pages = old.pages.map((page, pageIndex) => {
+        const data = page.data.map((entry) =>
+          resolveBookmarkItemId(entry) === itemId ? bookmark : entry,
+        );
+        if (exists) {
+          return data.some((entry, index) => entry !== page.data[index])
+            ? { ...page, data }
+            : page;
+        }
+
+        return {
+          ...page,
+          data: pageIndex === 0 ? [bookmark, ...data] : data,
+          total: page.total + 1,
+        };
+      });
+
+      return { ...old, pages };
+    },
+  );
+}
+
+function removeBookmarkFromCaches(qc: QueryClient, bookmarkId: number) {
+  qc.setQueriesData<BookmarksInfiniteData>(
+    { queryKey: queryKeys.bookmarks.lists() },
+    (old) => {
+      if (!old) return old;
+      const exists = old.pages.some((page) =>
+        page.data.some((bookmark) => bookmark.id === bookmarkId),
+      );
+      if (!exists) return old;
+
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          data: page.data.filter((bookmark) => bookmark.id !== bookmarkId),
+          total: Math.max(0, page.total - 1),
+        })),
+      };
+    },
+  );
+}
+
 export function useCreateBookmark() {
   const qc = useQueryClient();
   const { getFeedById } = useFeedLookup();
 
   return useMutation({
     mutationFn: async (item: Item) => {
+      const res = await bookmarkAPI.create({ item_id: item.id });
+      return res.data!;
+    },
+    onMutate: async (item) => {
+      await qc.cancelQueries({ queryKey: queryKeys.bookmarks.all });
+      const context = snapshotBookmarkLists(qc);
       const feed = getFeedById(item.feed_id);
-      const res = await bookmarkAPI.create({
+      upsertBookmarkInCaches(qc, {
+        id: -item.id,
         item_id: item.id,
         link: item.link,
         title: item.title,
         content: item.content,
         pub_date: item.pub_date,
         feed_name: feed?.name ?? "Unknown",
+        feed_id: item.feed_id,
+        unread: item.unread,
+        created_at: Math.floor(Date.now() / 1000),
       });
-      return res.data!;
+      return context;
     },
     onSuccess: (bookmark) => {
-      const itemId = resolveBookmarkItemId(bookmark);
-      // Optimistically insert/update across ALL bookmark list caches (including
-      // feed/group-filtered variants). This may add the bookmark to a filtered
-      // cache it doesn't belong in; onSettled below invalidates and reconciles.
-      qc.setQueriesData<BookmarksInfiniteData>(
-        { queryKey: queryKeys.bookmarks.lists() },
-        (old) => {
-          if (!old) return old;
-          const pages = [...old.pages];
-          const first = pages[0];
-          if (!first) return old;
-
-          const index = first.data.findIndex(
-            (b) => resolveBookmarkItemId(b) === itemId,
-          );
-          if (index !== -1) {
-            const newData = [...first.data];
-            newData[index] = bookmark;
-            pages[0] = { ...first, data: newData };
-          } else {
-            pages[0] = {
-              ...first,
-              data: [bookmark, ...first.data],
-              total: first.total + 1,
-            };
-          }
-          return { ...old, pages };
-        },
-      );
+      upsertBookmarkInCaches(qc, bookmark);
+    },
+    onError: (_error, _item, context) => {
+      restoreBookmarkLists(qc, context);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.bookmarks.all });
+      return qc.invalidateQueries({
+        queryKey: queryKeys.bookmarks.all,
+        refetchType: "none",
+      });
     },
   });
 }
@@ -209,28 +276,20 @@ export function useDeleteBookmark() {
       await bookmarkAPI.delete(bookmarkId);
       return bookmarkId;
     },
-    onSuccess: (bookmarkId) => {
-      // Optimistically remove from every bookmark list cache (filtered or not);
-      // onSettled below re-fetches to correct any cross-filter drift.
-      qc.setQueriesData<BookmarksInfiniteData>(
-        { queryKey: queryKeys.bookmarks.lists() },
-        (old) => {
-          if (!old) return old;
-          const pages = old.pages.map((page) => {
-            const newData = page.data.filter((b) => b.id !== bookmarkId);
-            if (newData.length === page.data.length) return page;
-            return {
-              ...page,
-              data: newData,
-              total: Math.max(0, page.total - 1),
-            };
-          });
-          return { ...old, pages };
-        },
-      );
+    onMutate: async (bookmarkId) => {
+      await qc.cancelQueries({ queryKey: queryKeys.bookmarks.all });
+      const context = snapshotBookmarkLists(qc);
+      removeBookmarkFromCaches(qc, bookmarkId);
+      return context;
+    },
+    onError: (_error, _bookmarkId, context) => {
+      restoreBookmarkLists(qc, context);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.bookmarks.all });
+      return qc.invalidateQueries({
+        queryKey: queryKeys.bookmarks.all,
+        refetchType: "none",
+      });
     },
   });
 }

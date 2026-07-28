@@ -107,8 +107,25 @@ function applyOptimisticItemReadState(
   prevFeeds: Feed[] | undefined,
 ) {
   const idSet = new Set(ids);
+  const transitionedIds = new Set<number>();
   const feedDeltaMap = new Map<number, number>();
   const updatedItemsById = new Map<number, Item>();
+
+  const recordTransition = (
+    itemId: number,
+    feedId: number,
+    currentUnread: boolean,
+  ) => {
+    if (transitionedIds.has(itemId) || currentUnread === targetUnread) {
+      return;
+    }
+
+    transitionedIds.add(itemId);
+    if (feedId > 0) {
+      const delta = targetUnread ? 1 : -1;
+      feedDeltaMap.set(feedId, (feedDeltaMap.get(feedId) ?? 0) + delta);
+    }
+  };
 
   qc.setQueriesData<ItemsInfiniteData>(
     { queryKey: queryKeys.items.lists() },
@@ -124,14 +141,11 @@ function applyOptimisticItemReadState(
               return item;
             }
 
-            const delta = targetUnread ? 1 : -1;
-            feedDeltaMap.set(
-              item.feed_id,
-              (feedDeltaMap.get(item.feed_id) ?? 0) + delta,
-            );
-
+            recordTransition(item.id, item.feed_id, item.unread);
             const updatedItem = { ...item, unread: targetUnread };
-            updatedItemsById.set(item.id, updatedItem);
+            if (!updatedItemsById.has(item.id)) {
+              updatedItemsById.set(item.id, updatedItem);
+            }
             return updatedItem;
           }),
         })),
@@ -140,6 +154,12 @@ function applyOptimisticItemReadState(
   );
 
   for (const id of ids) {
+    const cachedDetail = qc.getQueryData<Item>(queryKeys.items.detail(id));
+    if (cachedDetail && cachedDetail.unread !== targetUnread) {
+      recordTransition(cachedDetail.id, cachedDetail.feed_id, cachedDetail.unread);
+      updatedItemsById.set(id, { ...cachedDetail, unread: targetUnread });
+    }
+
     const optimisticItem = updatedItemsById.get(id);
     qc.setQueryData<Item>(queryKeys.items.detail(id), (old) =>
       old
@@ -147,20 +167,6 @@ function applyOptimisticItemReadState(
           ? { ...old, unread: targetUnread }
           : old
         : optimisticItem,
-    );
-  }
-
-  if (prevFeeds && feedDeltaMap.size > 0) {
-    qc.setQueryData(queryKeys.feeds.list(), (old: Feed[] | undefined) =>
-      old?.map((feed) => {
-        const delta = feedDeltaMap.get(feed.id) ?? 0;
-        if (delta === 0) return feed;
-
-        return {
-          ...feed,
-          unread_count: Math.max(0, feed.unread_count + delta),
-        };
-      }),
     );
   }
 
@@ -179,6 +185,11 @@ function applyOptimisticItemReadState(
             idSet.has(bookmark.item_id) &&
             bookmark.unread !== targetUnread
           ) {
+            recordTransition(
+              bookmark.item_id,
+              bookmark.feed_id ?? 0,
+              bookmark.unread,
+            );
             pageChanged = true;
             return { ...bookmark, unread: targetUnread };
           }
@@ -191,6 +202,20 @@ function applyOptimisticItemReadState(
       return changed ? { ...old, pages } : old;
     },
   );
+
+  if (prevFeeds && feedDeltaMap.size > 0) {
+    qc.setQueryData(queryKeys.feeds.list(), (old: Feed[] | undefined) =>
+      old?.map((feed) => {
+        const delta = feedDeltaMap.get(feed.id) ?? 0;
+        if (delta === 0) return feed;
+
+        return {
+          ...feed,
+          unread_count: Math.max(0, feed.unread_count + delta),
+        };
+      }),
+    );
+  }
 }
 
 function rollbackItemsMutation(
@@ -241,12 +266,6 @@ function useSetItemsReadState(targetUnread: boolean) {
     },
     onError: (_error, _ids, context) => {
       rollbackItemsMutation(qc, context);
-    },
-    onSettled: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: queryKeys.items.lists() }),
-        qc.invalidateQueries({ queryKey: queryKeys.feeds.all }),
-      ]);
     },
   });
 }
