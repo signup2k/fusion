@@ -30,13 +30,15 @@ Structure:
 
 ## Runtime configuration
 
-### deploy.sh (~280 lines, POSIX shell, map-updated 2026-07-18)
+### deploy.sh (~320 lines, POSIX shell, map-updated 2026-07-28)
 
-Purpose: Publishes main, builds and validates a candidate image on `bwgvps1`, then performs a backed-up production switch with rollback.
+Purpose: Deploys the already-pushed `origin/main`, builds and validates a candidate image on `bwgvps1`, then performs a backed-up production switch with rollback.
 Structure:
 
 - candidate validation (near L153): uses a read-only container with writable `/tmp` tmpfs and rejects SQLite startup errors.
 - production switch (near L185): ensures Compose tmpfs, backs up SQLite, switches images, and fails on startup or persistent SQLite errors.
+- retention cleanup (near L90/L300): after successful validation, keeps the five newest database backups and three newest application images.
+Gotchas: Local uncommitted changes are ignored because deployment always resolves the commit from `origin/main`; callers must push before deploying.
 
 ### .env.example (~64 lines, dotenv, map-updated 2026-07-16)
 

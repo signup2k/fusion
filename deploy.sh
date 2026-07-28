@@ -23,22 +23,11 @@ command -v scp >/dev/null 2>&1 || die "scp is required"
 git -C "$SOURCE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
   die "$SOURCE_DIR is not a Git repository"
 
-branch=$(git -C "$SOURCE_DIR" branch --show-current)
-[ "$branch" = "main" ] || die "deployment requires the local main branch (current: $branch)"
-
-[ -z "$(git -C "$SOURCE_DIR" status --porcelain)" ] ||
-  die "source repository has uncommitted changes"
-
-printf 'Fetching and publishing main...\n'
+printf 'Fetching origin/main...\n'
 git -C "$SOURCE_DIR" fetch origin main
-git -C "$SOURCE_DIR" push origin main
 
-commit=$(git -C "$SOURCE_DIR" rev-parse HEAD)
-origin_commit=$(git -C "$SOURCE_DIR" rev-parse origin/main)
-[ "$commit" = "$origin_commit" ] ||
-  die "local main does not match origin/main after push"
-
-short_commit=$(git -C "$SOURCE_DIR" rev-parse --short=7 HEAD)
+commit=$(git -C "$SOURCE_DIR" rev-parse origin/main)
+short_commit=$(git -C "$SOURCE_DIR" rev-parse --short=7 origin/main)
 image="$IMAGE_REPOSITORY:$short_commit"
 
 printf 'Deploying %s as %s to %s...\n' "$commit" "$image" "$SSH_HOST"
@@ -62,6 +51,7 @@ compose_backup=""
 previous_image=""
 backup_path=""
 production_switch_started=0
+image_repository=${image%:*}
 
 exec 9>"$remote_dir/.deploy.lock"
 flock -n 9 || {
@@ -90,6 +80,37 @@ wait_for_health() {
 cleanup_candidate() {
   docker rm -f "$candidate_name" >/dev/null 2>&1 || true
   rm -rf "$candidate_dir"
+}
+
+prune_old_backups() {
+  mapfile -t backup_files < <(
+    find "$remote_dir/backups" -maxdepth 1 -type f -name 'fusion-*.db' \
+      -printf '%T@ %p\n' |
+      sort -rn |
+      cut -d' ' -f2-
+  )
+
+  for ((i = 5; i < ${#backup_files[@]}; i++)); do
+    if rm -f -- "${backup_files[$i]}"; then
+      echo "Removed old database backup: ${backup_files[$i]}"
+    else
+      echo "warning: failed to remove old database backup: ${backup_files[$i]}" >&2
+    fi
+  done
+}
+
+prune_old_images() {
+  mapfile -t image_tags < <(
+    docker images "$image_repository" --format '{{.Repository}}:{{.Tag}}'
+  )
+
+  for ((i = 3; i < ${#image_tags[@]}; i++)); do
+    if docker image rm "${image_tags[$i]}" >/dev/null; then
+      echo "Removed old application image: ${image_tags[$i]}"
+    else
+      echo "warning: failed to remove old application image: ${image_tags[$i]}" >&2
+    fi
+  done
 }
 
 rollback() {
@@ -196,6 +217,8 @@ if [ "$previous_image" = "$image" ] && [ "$current_health" = "healthy" ] && [ -n
   curl -fsS "http://127.0.0.1:8010/api/oidc/enabled" >/dev/null
   curl -fsS "https://$domain/" >/dev/null
   trap - ERR INT TERM
+  prune_old_backups
+  prune_old_images
   echo "DEPLOYMENT_NOOP commit=$commit image=$image reason=already-healthy"
   exit 0
 fi
@@ -272,6 +295,9 @@ EOF
 rm -f "$compose_backup"
 production_switch_started=0
 trap - ERR INT TERM
+
+prune_old_backups
+prune_old_images
 
 echo "DEPLOYMENT_SUCCESS commit=$commit image=$image backup=$backup_path"
 REMOTE_SCRIPT
