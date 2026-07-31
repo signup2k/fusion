@@ -64,8 +64,11 @@ async function request<T>(
   return JSON.parse(body) as T;
 }
 
-async function get<T>(endpoint: string): Promise<T> {
-  return request<T>(endpoint, { method: "GET" });
+async function get<T>(
+  endpoint: string,
+  options: Omit<RequestInit, "method"> = {},
+): Promise<T> {
+  return request<T>(endpoint, { ...options, method: "GET" });
 }
 
 async function post<T>(endpoint: string, data?: unknown): Promise<T> {

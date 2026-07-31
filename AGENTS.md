@@ -1,5 +1,7 @@
 # Agent Instructions
 
+Read `docs/FILE_MAP.md` before exploring or opening files; keep it updated per the repo-map skill.
+
 ## Communication
 
 - Use English for all documentation and code comments.
@@ -10,6 +12,19 @@
 
 - This project is an open-source, lightweight RSS reader and aggregator.
 - Prioritize simplicity and maintainability over complexity.
+- Treat it as a small, personal project: optimize for a fast, pleasant single-user experience and low maintenance cost, not hypothetical scale.
+
+## Change Hierarchy and Website-Specific Fixes
+
+All future user-requested fixes for a specific website must follow this hierarchy:
+
+1. Fix the existing standards-based path only when the problem is genuinely generic.
+2. Extract a small shared helper only when multiple real cases already need the same behavior.
+3. Otherwise, add an isolated website-specific compatibility rule at the closest existing boundary (discovery, fetch, parsing, normalization, or content rendering), scoped by a normalized hostname and preserving the generic fallback.
+
+For a single-site quirk, prefer one small function, lookup entry, or explicit branch plus a focused regression test or fixture. Do not introduce a plugin system, adapter framework, registry, dependency-injection layer, new service, schema change, configuration surface, or settings UI unless current requirements clearly justify it.
+
+Keep changes local to the layer that owns the behavior and avoid unrelated refactors. Basic extensibility means leaving an obvious place for the next proven rule; create broader abstractions only after real repetition appears.
 
 ## Code Standards
 

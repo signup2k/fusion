@@ -144,18 +144,20 @@ function FeedsPage() {
   };
 
   const handleRefreshAll = async () => {
+    const refreshPromise = refreshFeedsMutation.mutateAsync();
+    toast.success(t("feeds.toast.refreshing"));
     try {
-      await refreshFeedsMutation.mutateAsync();
-      toast.success(t("feeds.toast.refreshing"));
+      await refreshPromise;
     } catch {
       toast.error(t("feeds.toast.refreshFailed"));
     }
   };
 
   const handleRefreshFeed = async (feed: Feed) => {
+    const refreshPromise = refreshFeedMutation.mutateAsync(feed.id);
+    toast.success(t("feeds.toast.refreshingOne", { name: feed.name }));
     try {
-      await refreshFeedMutation.mutateAsync(feed.id);
-      toast.success(t("feeds.toast.refreshingOne", { name: feed.name }));
+      await refreshPromise;
     } catch {
       toast.error(t("feeds.toast.refreshOneFailed", { name: feed.name }));
     }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,12 @@ import { SidebarTrigger } from "@/components/layout/sidebar-trigger";
 import { useArticleNavigation } from "@/hooks/use-keyboard";
 import { useUrlState, type ArticleFilter } from "@/hooks/use-url-state";
 import { useArticleList } from "@/hooks/use-article-list";
-import { useMarkItemsRead, useMarkItemsUnread } from "@/queries/items";
+import {
+  itemQueries,
+  useMarkAllItemsRead,
+  useMarkItemsRead,
+  useMarkItemsUnread,
+} from "@/queries/items";
 import { useFeedLookup } from "@/queries/feeds";
 import { useGroups } from "@/queries/groups";
 import { useCreateBookmark, useDeleteBookmark } from "@/queries/bookmarks";
@@ -21,6 +27,7 @@ import type { Item } from "@/lib/api";
 export function ArticleList() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const {
     articleFilter,
     setArticleFilter,
@@ -48,6 +55,7 @@ export function ArticleList() {
   const { feeds, getFeedById, isLoading: isFeedsLoading } = useFeedLookup();
   const markItemsRead = useMarkItemsRead();
   const markItemsUnread = useMarkItemsUnread();
+  const markAllItemsRead = useMarkAllItemsRead();
   const createBookmark = useCreateBookmark();
   const deleteBookmark = useDeleteBookmark();
   const markItemsReadAsync = markItemsRead.mutateAsync;
@@ -55,6 +63,7 @@ export function ArticleList() {
   const createBookmarkAsync = createBookmark.mutateAsync;
   const deleteBookmarkAsync = deleteBookmark.mutateAsync;
   const setSelectedArticleRef = useRef(setSelectedArticle);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     setSelectedArticleRef.current = setSelectedArticle;
   }, [setSelectedArticle]);
@@ -62,6 +71,31 @@ export function ArticleList() {
     (articleId: number | null) => setSelectedArticleRef.current(articleId),
     [],
   );
+  const prefetchArticle = useCallback(
+    (articleId: number) => {
+      if (articleId > 0) {
+        void queryClient.prefetchQuery(itemQueries.detail(articleId));
+      }
+    },
+    [queryClient],
+  );
+
+  useEffect(() => {
+    const loadMore = loadMoreRef.current;
+    if (!loadMore || !hasMore || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+    observer.observe(loadMore);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasMore, isLoadingMore]);
 
   const articleIds = articles.map((a) => a.id);
   useArticleNavigation(articleIds, {
@@ -78,6 +112,14 @@ export function ArticleList() {
   }
 
   const unreadCount = articles.filter((a) => a.unread).length;
+  const scopedUnreadCount = selectedFeedId
+    ? (getFeedById(selectedFeedId)?.unread_count ?? 0)
+    : selectedGroupId
+      ? feeds
+          .filter((feed) => feed.group_id === selectedGroupId)
+          .reduce((total, feed) => total + feed.unread_count, 0)
+      : feeds.reduce((total, feed) => total + feed.unread_count, 0);
+  const canMarkAllAsRead = Math.max(unreadCount, scopedUnreadCount) > 0;
   const hasNoFeeds = !isFeedsLoading && feeds.length === 0;
 
   const handleToggleRead = useCallback(
@@ -130,10 +172,14 @@ export function ArticleList() {
       .filter((a) => a.unread && a.id > 0)
       .map((a) => a.id);
 
-    if (unreadIds.length === 0) return;
-
     try {
-      await markItemsReadAsync(unreadIds);
+      await markAllItemsRead.mutateAsync({
+        visibleIds: unreadIds,
+        scope: {
+          feed_id: selectedFeedId ?? undefined,
+          group_id: selectedGroupId ?? undefined,
+        },
+      });
     } catch (error) {
       console.error("Failed to mark all as read:", error);
     }
@@ -146,16 +192,22 @@ export function ArticleList() {
           <SidebarTrigger />
           <h2 className="truncate text-lg font-semibold">{title}</h2>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleMarkAllAsRead}
-          disabled={unreadCount === 0}
-          className="gap-1.5 text-xs"
-        >
-          <CheckCheck className="h-4 w-4" />
-          {t("article.list.markAllRead")}
-        </Button>
+        {articleFilter !== "starred" && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMarkAllAsRead}
+            disabled={!canMarkAllAsRead || markAllItemsRead.isPending}
+            className="gap-1.5 text-xs"
+          >
+            {markAllItemsRead.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCheck className="h-4 w-4" />
+            )}
+            {t("article.list.markAllRead")}
+          </Button>
+        )}
       </ContentHeader>
 
       {/* Article area with filter tabs */}
@@ -223,6 +275,7 @@ export function ArticleList() {
                       onSelectArticle={selectArticle}
                       onToggleRead={handleToggleRead}
                       onToggleStar={handleToggleStar}
+                      onPrefetchArticle={prefetchArticle}
                       canToggleRead={article.id > 0}
                       isStarred={isItemStarred(article.id)}
                       feedName={feed?.name ?? bookmark?.feed_name ?? t("common.unknown")}
@@ -233,7 +286,7 @@ export function ArticleList() {
                   );
                 })}
                 {hasMore && (
-                  <div className="flex justify-center py-4">
+                  <div ref={loadMoreRef} className="flex justify-center py-4">
                     <Button
                       variant="outline"
                       size="sm"

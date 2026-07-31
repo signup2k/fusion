@@ -74,7 +74,7 @@ This keeps list context stable while opening/closing article detail.
 
 - Header with page title and "Mark all as read"
 - Filter tabs: All / Unread / Starred
-- Infinite article list (load more)
+- Infinite article list that loads near the bottom, with a manual load-more fallback
 - Article cards with quick actions (read/unread, star)
 
 ### Article drawer
@@ -96,8 +96,11 @@ This keeps list context stable while opening/closing article detail.
 - Query logic lives in `frontend/src/queries/`
 - TanStack Query handles:
   - cursor-based pagination for items and bookmarks (opaque `next_cursor` passed as the `before` query param; `next_cursor` is null when no more pages exist)
+  - lightweight item previews for list rendering, with full detail prefetched on pointer hover or keyboard focus and fetched on demand otherwise
   - optimistic read/unread updates
   - cache invalidation after mutations
+- Manual feed refreshes poll the existing feed fetch timestamps for a bounded period so accepted background work is reflected without adding a job system.
+- Sanitized article images preserve safe width/height hints and use native lazy loading plus asynchronous decoding.
 - Zustand stores transient UI state only (dialogs, mobile sidebar, edit targets)
 
 ## 8. Search and bookmarks

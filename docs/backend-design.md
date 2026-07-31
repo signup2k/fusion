@@ -142,7 +142,8 @@ This keeps behavior explicit and avoids hidden DB-level side effects.
 - OIDC: enabled status, login URL, callback
 - Groups: list/get/create/update/delete
 - Feeds: list/get/create/update/delete/validate/batch create/refresh
-- Items: list/get/mark read/mark unread
+- Items: list/get/mark read/mark unread/mark all in the current scope
+  - List callers may request a bounded `content_preview` while omitting full HTML; item detail remains the source of complete content.
 - Search: feed + item search
 - Bookmarks: list/get/create/delete
 

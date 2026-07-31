@@ -16,6 +16,7 @@ import (
 // ordered before that (pub_date, id) position are returned (nil = first page).
 // OrderBy accepts "pub_date" (default) or "created_at".
 // Limit = 0 means no limit.
+// Preview omits full content and returns a bounded content preview instead.
 type ListItemsParams struct {
 	FeedID        *int64
 	GroupID       *int64
@@ -24,13 +25,18 @@ type ListItemsParams struct {
 	BeforePubDate *int64
 	BeforeID      *int64
 	OrderBy       string // "pub_date" or "created_at"
+	Preview       bool
 }
 
 func (s *Store) ListItems(params ListItemsParams) ([]*model.Item, error) {
-	query := `
-		SELECT items.id, items.feed_id, items.guid, items.title, items.link, items.content, items.pub_date, items.unread, items.created_at
-		FROM items
-	`
+	contentColumns := "items.content, ''"
+	if params.Preview {
+		contentColumns = "'', substr(items.content, 1, 2048)"
+	}
+	query := fmt.Sprintf(`
+			SELECT items.id, items.feed_id, items.guid, items.title, items.link, %s, items.pub_date, items.unread, items.created_at
+			FROM items
+		`, contentColumns)
 	args := []any{}
 
 	// Join feeds table if filtering by GroupID
@@ -82,7 +88,7 @@ func (s *Store) ListItems(params ListItemsParams) ([]*model.Item, error) {
 	for rows.Next() {
 		i := &model.Item{}
 		var unread int
-		if err := rows.Scan(&i.ID, &i.FeedID, &i.GUID, &i.Title, &i.Link, &i.Content, &i.PubDate, &unread, &i.CreatedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.FeedID, &i.GUID, &i.Title, &i.Link, &i.Content, &i.ContentPreview, &i.PubDate, &unread, &i.CreatedAt); err != nil {
 			return nil, err
 		}
 		i.Unread = intToBool(unread)
@@ -250,10 +256,13 @@ func (s *Store) batchUpdateItemsUnreadChunk(ids []int64, unread bool) error {
 // If feedID is non-nil, only marks items from that specific feed.
 func (s *Store) MarkAllAsRead(feedID *int64) error {
 	if feedID != nil {
-		_, err := s.db.Exec(`UPDATE items SET unread = 0 WHERE feed_id = :feed_id`, sql.Named("feed_id", *feedID))
+		_, err := s.db.Exec(
+			`UPDATE items SET unread = 0 WHERE unread = 1 AND feed_id = :feed_id`,
+			sql.Named("feed_id", *feedID),
+		)
 		return err
 	}
-	_, err := s.db.Exec(`UPDATE items SET unread = 0`)
+	_, err := s.db.Exec(`UPDATE items SET unread = 0 WHERE unread = 1`)
 	return err
 }
 
@@ -261,11 +270,12 @@ func (s *Store) MarkGroupAsRead(groupID int64) error {
 	_, err := s.db.Exec(`
 		UPDATE items
 		SET unread = 0
-		WHERE feed_id IN (
-			SELECT id
-			FROM feeds
-			WHERE group_id = :group_id
-		)
+		WHERE unread = 1
+		  AND feed_id IN (
+				SELECT id
+				FROM feeds
+				WHERE group_id = :group_id
+			)
 	`, sql.Named("group_id", groupID))
 	return err
 }

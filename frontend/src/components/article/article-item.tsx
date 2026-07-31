@@ -13,6 +13,7 @@ interface ArticleItemProps {
   onSelectArticle: (articleId: number | null) => void;
   onToggleRead: (article: Item) => Promise<void>;
   onToggleStar: (article: Item) => Promise<void>;
+  onPrefetchArticle: (articleId: number) => void;
   canToggleRead: boolean;
   isStarred: boolean;
   feedName: string;
@@ -25,6 +26,7 @@ export const ArticleItem = memo(function ArticleItem({
   onSelectArticle,
   onToggleRead,
   onToggleStar,
+  onPrefetchArticle,
   canToggleRead,
   isStarred,
   feedName,
@@ -33,9 +35,10 @@ export const ArticleItem = memo(function ArticleItem({
   const { t } = useI18n();
 
   const safeArticleLink = toSafeExternalUrl(article.link);
+  const summarySource = article.content_preview ?? article.content;
   const summary = useMemo(
-    () => extractSummary(article.content, 150),
-    [article.content],
+    () => extractSummary(summarySource, 150),
+    [summarySource],
   );
 
   const handleToggleRead = async (e: React.MouseEvent) => {
@@ -63,6 +66,8 @@ export const ArticleItem = memo(function ArticleItem({
       role="button"
       tabIndex={0}
       onClick={() => onSelectArticle(article.id)}
+      onPointerEnter={() => onPrefetchArticle(article.id)}
+      onFocus={() => onPrefetchArticle(article.id)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();

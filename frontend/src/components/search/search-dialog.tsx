@@ -39,43 +39,49 @@ export function SearchDialog() {
   const [feeds, setFeeds] = useState<SearchFeed[]>([]);
   const [items, setItems] = useState<SearchItem[]>([]);
 
-  // Debounce search query
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(Boolean(query));
-      setDebouncedQuery(query);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  // Fetch search results from backend
-  useEffect(() => {
-    if (!debouncedQuery) {
+    if (!query.trim()) {
+      setDebouncedQuery("");
+      setFeeds([]);
+      setItems([]);
+      setLoading(false);
       return;
     }
 
-    let cancelled = false;
+    setLoading(true);
+    setFeeds([]);
+    setItems([]);
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    const normalizedQuery = debouncedQuery.trim();
+    if (!normalizedQuery || normalizedQuery !== query.trim()) {
+      return;
+    }
+
+    const controller = new AbortController();
 
     searchAPI
-      .search(debouncedQuery)
+      .search(normalizedQuery, 10, controller.signal)
       .then((res) => {
-        if (cancelled) return;
         setFeeds(res.data?.feeds ?? []);
         setItems(res.data?.items ?? []);
       })
       .catch(() => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setFeeds([]);
         setItems([]);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedQuery]);
+    return () => controller.abort();
+  }, [debouncedQuery, query]);
 
   const handleSelectFeed = (feedId: number) => {
     setSelectedFeed(feedId);

@@ -43,6 +43,7 @@ export interface Item {
   title: string;
   link: string;
   content: string;
+  content_preview?: string;
   pub_date: number;
   unread: boolean;
   created_at: number;
@@ -140,10 +141,16 @@ export interface MarkItemsReadRequest {
   ids: number[];
 }
 
+export interface MarkAllItemsReadRequest {
+  feed_id?: number;
+  group_id?: number;
+}
+
 export interface ListItemsParams {
   feed_id?: number;
   group_id?: number;
   unread?: boolean;
+  preview?: boolean;
   limit?: number;
   before?: string;
   order_by?: string;

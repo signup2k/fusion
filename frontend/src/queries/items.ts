@@ -8,7 +8,13 @@ import {
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { itemAPI, type Feed, type Item, type ListItemsParams } from "@/lib/api";
+import {
+  itemAPI,
+  type Feed,
+  type Item,
+  type ListItemsParams,
+  type MarkAllItemsReadRequest,
+} from "@/lib/api";
 import {
   normalizeItemFilters,
   queryKeys,
@@ -37,6 +43,7 @@ function buildListItemsParams(
   const params: ListItemsParams = {
     limit: pageSize,
     order_by: "pub_date:desc",
+    preview: true,
   };
 
   if (filters.feedId) params.feed_id = filters.feedId;
@@ -160,13 +167,12 @@ function applyOptimisticItemReadState(
       updatedItemsById.set(id, { ...cachedDetail, unread: targetUnread });
     }
 
-    const optimisticItem = updatedItemsById.get(id);
     qc.setQueryData<Item>(queryKeys.items.detail(id), (old) =>
       old
         ? old.unread !== targetUnread
           ? { ...old, unread: targetUnread }
           : old
-        : optimisticItem,
+        : old,
     );
   }
 
@@ -276,4 +282,40 @@ export function useMarkItemsRead() {
 
 export function useMarkItemsUnread() {
   return useSetItemsReadState(true);
+}
+
+export function useMarkAllItemsRead() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      scope,
+    }: {
+      visibleIds: number[];
+      scope: MarkAllItemsReadRequest;
+    }) => {
+      await itemAPI.markAllRead(scope);
+    },
+    onMutate: async ({ visibleIds }) => {
+      await Promise.all([
+        qc.cancelQueries({ queryKey: queryKeys.items.all }),
+        qc.cancelQueries({ queryKey: queryKeys.feeds.all }),
+      ]);
+
+      const context = snapshotItemsMutationState(qc, visibleIds);
+      if (visibleIds.length > 0) {
+        applyOptimisticItemReadState(qc, visibleIds, false, context.prevFeeds);
+      }
+      return context;
+    },
+    onError: (_error, _variables, context) => {
+      rollbackItemsMutation(qc, context);
+    },
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.items.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.feeds.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.bookmarks.all }),
+      ]),
+  });
 }

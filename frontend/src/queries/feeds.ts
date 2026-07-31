@@ -1,12 +1,65 @@
 import { useMemo, useCallback } from "react";
 import {
   queryOptions,
+  type QueryClient,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { feedAPI, type Feed } from "@/lib/api";
 import { queryKeys } from "./keys";
+
+const refreshPollDelays = [500, 1000, 2000, 4000, 8000, 15000] as const;
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, delayMs));
+}
+
+async function synchronizeRefresh(
+  qc: QueryClient,
+  targetFeedIds: number[],
+  requestedAt: number,
+): Promise<void> {
+  let completedCount = 0;
+  const targetFeedIdSet = new Set(targetFeedIds);
+
+  for (const delayMs of refreshPollDelays) {
+    await wait(delayMs);
+
+    const response = await feedAPI.list();
+    const feeds = response.data;
+    qc.setQueryData(queryKeys.feeds.list(), feeds);
+
+    if (targetFeedIds.length === 0) {
+      await qc.invalidateQueries({ queryKey: queryKeys.items.all });
+      return;
+    }
+
+    const completedFeedIds = new Set(
+      feeds
+        .filter(
+          (feed) =>
+            targetFeedIdSet.has(feed.id) &&
+            feed.fetch_state.last_checked_at >= requestedAt,
+        )
+        .map((feed) => feed.id),
+    );
+
+    if (completedFeedIds.size > completedCount) {
+      completedCount = completedFeedIds.size;
+      await qc.invalidateQueries({ queryKey: queryKeys.items.all });
+    }
+
+    if (completedFeedIds.size === targetFeedIds.length) {
+      return;
+    }
+  }
+
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: queryKeys.feeds.all }),
+    qc.invalidateQueries({ queryKey: queryKeys.items.all }),
+  ]);
+}
 
 export const feedQueries = {
   list: () =>
@@ -137,10 +190,15 @@ export function useDeleteFeeds() {
 export function useRefreshFeeds() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => feedAPI.refresh(),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.feeds.all });
-      qc.invalidateQueries({ queryKey: queryKeys.items.all });
+    mutationFn: async () => {
+      const requestedAt = Math.floor(Date.now() / 1000);
+      const feeds = qc.getQueryData<Feed[]>(queryKeys.feeds.list()) ?? [];
+      const targetFeedIds = feeds
+        .filter((feed) => !feed.suspended)
+        .map((feed) => feed.id);
+
+      await feedAPI.refresh();
+      await synchronizeRefresh(qc, targetFeedIds, requestedAt);
     },
   });
 }
@@ -148,10 +206,10 @@ export function useRefreshFeeds() {
 export function useRefreshFeed() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => feedAPI.refreshOne(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.feeds.all });
-      qc.invalidateQueries({ queryKey: queryKeys.items.all });
+    mutationFn: async (id: number) => {
+      const requestedAt = Math.floor(Date.now() / 1000);
+      await feedAPI.refreshOne(id);
+      await synchronizeRefresh(qc, [id], requestedAt);
     },
   });
 }

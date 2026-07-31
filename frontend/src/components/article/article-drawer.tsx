@@ -65,18 +65,25 @@ export function ArticleDrawer() {
   const storeArticle = selectedArticleId
     ? (articles.find((i) => i.id === selectedArticleId) ?? null)
     : null;
+  const hasFullStoreArticle = Boolean(storeArticle?.content);
 
   const shouldFetchArticle =
     selectedArticleId !== null &&
     selectedArticleId > 0 &&
-    (isStarredMode || storeArticle === null);
-  const { data: fetchedArticle } = useItem(
-    selectedArticleId,
-    shouldFetchArticle,
-  );
+    (isStarredMode || !hasFullStoreArticle);
+  const {
+    data: fetchedArticle,
+    isLoading: isArticleLoading,
+    isError: isArticleError,
+    refetch: refetchArticle,
+  } = useItem(selectedArticleId, shouldFetchArticle);
 
   const article: Item | null =
-    (isStarredMode ? fetchedArticle ?? storeArticle : storeArticle ?? fetchedArticle) ??
+    (isStarredMode
+      ? fetchedArticle ?? storeArticle
+      : hasFullStoreArticle
+        ? storeArticle
+        : fetchedArticle) ??
     null;
   const autoReadArticleIdRef = useRef<number | null>(null);
   const canToggleRead = article !== null && article.id > 0;
@@ -198,6 +205,49 @@ export function ArticleDrawer() {
         className="data-[side=right]:w-full data-[side=right]:sm:max-w-[max(840px,60vw)] p-0"
         showCloseButton={false}
       >
+        {!article && selectedArticleId !== null && (
+          <div className="flex h-full flex-col">
+            <SheetTitle className="sr-only">
+              {isArticleError
+                ? t("article.detail.loadFailed")
+                : t("article.detail.loading")}
+            </SheetTitle>
+            <div className="flex items-center justify-end border-b px-4 py-3 sm:px-6">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setSelectedArticle(null)}
+                aria-label={t("common.cancel")}
+              >
+                <X className="h-[18px] w-[18px] text-muted-foreground" />
+              </Button>
+            </div>
+            {isArticleLoading ? (
+              <div className="space-y-5 px-5 py-6 sm:px-12 sm:py-8">
+                <div className="h-9 w-3/4 animate-pulse rounded bg-accent" />
+                <div className="h-5 w-1/3 animate-pulse rounded bg-accent" />
+                <div className="space-y-3 pt-4">
+                  <div className="h-4 animate-pulse rounded bg-accent" />
+                  <div className="h-4 animate-pulse rounded bg-accent" />
+                  <div className="h-4 w-5/6 animate-pulse rounded bg-accent" />
+                </div>
+              </div>
+            ) : isArticleError ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {t("article.detail.loadFailed")}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void refetchArticle()}
+                >
+                  {t("common.refresh")}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
         {article && (
           <div className="flex h-full flex-col">
             {/* Header */}

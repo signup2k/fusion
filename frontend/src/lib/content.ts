@@ -37,7 +37,19 @@ const ALLOWED_TAGS = [
   "figcaption",
 ];
 
-const ALLOWED_ATTR = ["href", "src", "alt", "title", "class", "target", "rel"];
+const ALLOWED_ATTR = [
+  "href",
+  "src",
+  "alt",
+  "title",
+  "class",
+  "target",
+  "rel",
+  "width",
+  "height",
+  "loading",
+  "decoding",
+];
 
 // Tags that are meaningful even when empty
 const SELF_CLOSING_TAGS = new Set(["br", "hr", "img", "td", "th", "li"]);
@@ -100,7 +112,11 @@ function sanitizeImages(root: DocumentFragment, articleUrl: string | null): void
     img.setAttribute("src", safeSrc);
     if (isTrackingPixel(img)) {
       img.remove();
+      continue;
     }
+
+    img.setAttribute("loading", "lazy");
+    img.setAttribute("decoding", "async");
   }
 }
 

@@ -16,6 +16,7 @@ import type {
   FeedCheckResponse,
   CreateBookmarkRequest,
   MarkItemsReadRequest,
+  MarkAllItemsReadRequest,
   ListItemsParams,
   ListBookmarksParams,
   BatchCreateFeedsRequest,
@@ -91,6 +92,8 @@ export const itemAPI = {
     if (params?.group_id) query.set("group_id", params.group_id.toString());
     if (params?.unread !== undefined)
       query.set("unread", params.unread.toString());
+    if (params?.preview !== undefined)
+      query.set("preview", params.preview.toString());
     if (params?.limit) query.set("limit", params.limit.toString());
     if (params?.before) query.set("before", params.before);
     if (params?.order_by) query.set("order_by", params.order_by);
@@ -108,6 +111,9 @@ export const itemAPI = {
 
   markUnread: (data: MarkItemsReadRequest) =>
     api.patch<void>("/items/-/unread", data),
+
+  markAllRead: (data: MarkAllItemsReadRequest) =>
+    api.patch<void>("/items/-/read-all", data),
 };
 
 // Bookmark APIs
@@ -131,9 +137,10 @@ export const bookmarkAPI = {
 
 // Search APIs
 export const searchAPI = {
-  search: (q: string, limit = 10) =>
+  search: (q: string, limit = 10, signal?: AbortSignal) =>
     api.get<APIResponse<SearchResponse>>(
       `/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+      { signal },
     ),
 };
 

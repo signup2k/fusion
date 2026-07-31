@@ -436,6 +436,12 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: preview
+          in: query
+          description: When true, omit full content and return a content_preview of at most 2048 characters for lightweight lists.
+          schema:
+            type: boolean
+            default: false
         - name: limit
           in: query
           schema:
@@ -521,6 +527,27 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/MarkItemsRequest"
+      responses:
+        "204":
+          description: Read state updated
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /items/-/read-all:
+    patch:
+      tags: [Items]
+      summary: Mark all items in a scope as read
+      description: With no scope, marks every item as read. Provide either feed_id or group_id to limit the update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkAllItemsReadRequest"
       responses:
         "204":
           description: Read state updated
@@ -1060,6 +1087,9 @@ components:
           type: string
         content:
           type: string
+        content_preview:
+          type: string
+          description: Optional bounded HTML preview returned by lightweight list requests.
         pub_date:
           type: integer
           format: int64
@@ -1102,6 +1132,18 @@ components:
           items:
             type: integer
             format: int64
+
+    MarkAllItemsReadRequest:
+      type: object
+      properties:
+        feed_id:
+          type: integer
+          format: int64
+          minimum: 1
+        group_id:
+          type: integer
+          format: int64
+          minimum: 1
 
     SearchFeed:
       type: object

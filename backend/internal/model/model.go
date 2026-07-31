@@ -57,15 +57,17 @@ type FeedFetchState struct {
 
 // Item represents a feed item.
 type Item struct {
-	ID        int64  `json:"id"`
-	FeedID    int64  `json:"feed_id"`
-	GUID      string `json:"guid"`
-	Title     string `json:"title"`
-	Link      string `json:"link"`
-	Content   string `json:"content"`
-	PubDate   int64  `json:"pub_date"`
-	Unread    bool   `json:"unread"`
-	CreatedAt int64  `json:"created_at"`
+	ID      int64  `json:"id"`
+	FeedID  int64  `json:"feed_id"`
+	GUID    string `json:"guid"`
+	Title   string `json:"title"`
+	Link    string `json:"link"`
+	Content string `json:"content"`
+	// ContentPreview is populated only by lightweight list requests.
+	ContentPreview string `json:"content_preview,omitempty"`
+	PubDate        int64  `json:"pub_date"`
+	Unread         bool   `json:"unread"`
+	CreatedAt      int64  `json:"created_at"`
 }
 
 // Bookmark represents a saved item snapshot.
