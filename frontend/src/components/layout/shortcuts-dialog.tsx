@@ -1,5 +1,4 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useI18n } from "@/lib/i18n";
 import { useUIStore } from "@/store";
 
 interface ShortcutItem {
@@ -13,44 +12,43 @@ interface ShortcutSection {
 }
 
 export function ShortcutsDialog() {
-  const { t } = useI18n();
   const isShortcutsOpen = useUIStore((s) => s.isShortcutsOpen);
   const setShortcutsOpen = useUIStore((s) => s.setShortcutsOpen);
 
   const sections: ShortcutSection[] = [
     {
-      title: t("shortcuts.section.global"),
+      title: "全局",
       items: [
-        { keys: "Cmd+K / Ctrl+K", action: t("shortcuts.action.toggleSearch") },
-        { keys: "/", action: t("shortcuts.action.openSearch") },
-        { keys: "Cmd+, / Ctrl+,", action: t("shortcuts.action.openSettings") },
-        { keys: "?", action: t("shortcuts.action.showHelp") },
-        { keys: "Esc", action: t("shortcuts.action.closeDialog") },
+        { keys: "Cmd+K / Ctrl+K", action: "切换搜索弹窗" },
+        { keys: "/", action: "打开搜索" },
+        { keys: "Cmd+, / Ctrl+,", action: "打开设置" },
+        { keys: "?", action: "打开快捷键帮助" },
+        { keys: "Esc", action: "关闭当前打开的弹窗或抽屉" },
       ],
     },
     {
-      title: t("shortcuts.section.article"),
+      title: "文章",
       items: [
         {
           keys: "j / ArrowDown / n",
-          action: t("shortcuts.action.nextArticle"),
+          action: "选择下一篇文章",
         },
         {
           keys: "k / ArrowUp / p",
-          action: t("shortcuts.action.previousArticle"),
+          action: "选择上一篇文章",
         },
-        { keys: "m", action: t("shortcuts.action.toggleRead") },
-        { keys: "s / f", action: t("shortcuts.action.toggleStar") },
-        { keys: "o / v", action: t("shortcuts.action.openOriginal") },
+        { keys: "m", action: "切换已读/未读" },
+        { keys: "s / f", action: "切换收藏" },
+        { keys: "o / v", action: "打开原文" },
       ],
     },
     {
-      title: t("shortcuts.section.navigation"),
+      title: "导航",
       items: [
-        { keys: "g u", action: t("shortcuts.action.goUnread") },
-        { keys: "g a", action: t("shortcuts.action.goAll") },
-        { keys: "g s", action: t("shortcuts.action.goStarred") },
-        { keys: "g f", action: t("shortcuts.action.goFeeds") },
+        { keys: "g u", action: "跳转到未读文章" },
+        { keys: "g a", action: "跳转到全部文章" },
+        { keys: "g s", action: "跳转到收藏文章" },
+        { keys: "g f", action: "跳转到订阅管理" },
       ],
     },
   ];
@@ -59,7 +57,7 @@ export function ShortcutsDialog() {
     <Dialog open={isShortcutsOpen} onOpenChange={setShortcutsOpen}>
       <DialogContent className="sm:max-w-[560px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t("shortcuts.title")}</DialogTitle>
+          <DialogTitle>键盘快捷键</DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
           {sections.map((section) => (

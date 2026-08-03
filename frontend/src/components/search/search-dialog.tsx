@@ -23,12 +23,10 @@ import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/store";
 import { useFeedLookup } from "@/queries/feeds";
 import { useUrlState } from "@/hooks/use-url-state";
-import { useI18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
 import { FeedFavicon } from "@/components/feed/feed-favicon";
 
 export function SearchDialog() {
-  const { t } = useI18n();
   const { isSearchOpen, setSearchOpen, setEditFeedOpen, setShortcutsOpen } =
     useUIStore();
   const { getFeedById } = useFeedLookup();
@@ -121,8 +119,8 @@ export function SearchDialog() {
   return (
     <Dialog open={isSearchOpen} onOpenChange={handleOpenChange}>
       <DialogHeader className="sr-only">
-        <DialogTitle>{t("search.title")}</DialogTitle>
-        <DialogDescription>{t("search.description")}</DialogDescription>
+        <DialogTitle>搜索</DialogTitle>
+        <DialogDescription>搜索订阅源和文章</DialogDescription>
       </DialogHeader>
       <DialogContent className="overflow-hidden p-0" showCloseButton={false}>
         <Command
@@ -130,7 +128,7 @@ export function SearchDialog() {
           className="[&_[cmdk-group-heading]]:text-muted-foreground **:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
         >
           <CommandInput
-            placeholder={t("search.placeholder")}
+            placeholder="搜索订阅源和文章..."
             value={query}
             onValueChange={setQuery}
           />
@@ -145,11 +143,11 @@ export function SearchDialog() {
               debouncedQuery &&
               feeds.length === 0 &&
               items.length === 0 && (
-                <CommandEmpty>{t("search.noResults")}</CommandEmpty>
+                <CommandEmpty>未找到结果。</CommandEmpty>
               )}
 
             {feeds.length > 0 && (
-              <CommandGroup heading={t("search.group.feeds")}>
+              <CommandGroup heading="订阅源">
                 {feeds.map((feed) => (
                   <CommandItem
                     key={`feed-${feed.id}`}
@@ -166,7 +164,7 @@ export function SearchDialog() {
                       variant="outline"
                       size="icon-xs"
                       onClick={(e) => handleEditFeed(e, feed.id)}
-                      aria-label={t("feed.edit.title")}
+                      aria-label="编辑订阅"
                     >
                       <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
@@ -178,7 +176,7 @@ export function SearchDialog() {
             {feeds.length > 0 && items.length > 0 && <CommandSeparator />}
 
             {items.length > 0 && (
-              <CommandGroup heading={t("search.group.articles")}>
+              <CommandGroup heading="文章">
                 {items.map((article) => {
                   const feed = getFeedById(article.feed_id);
                   return (
@@ -193,7 +191,7 @@ export function SearchDialog() {
                         <span className="flex-1 truncate">{article.title}</span>
                       </div>
                       <div className="flex w-full items-center gap-2 pl-6 text-xs text-muted-foreground">
-                        <span>{feed?.name ?? t("search.unknownFeed")}</span>
+                        <span>{feed?.name ?? "未知订阅源"}</span>
                         <span>·</span>
                         <span>{formatDate(article.pub_date)}</span>
                       </div>
@@ -204,10 +202,10 @@ export function SearchDialog() {
             )}
 
             {!debouncedQuery && !loading && (
-              <CommandGroup heading={t("search.group.quickActions")}>
+              <CommandGroup heading="快捷操作">
                 <CommandItem className="gap-2">
                   <Search className="h-4 w-4 text-muted-foreground" />
-                  <span>{t("search.quickActionHint")}</span>
+                  <span>输入关键词以搜索订阅源和文章</span>
                 </CommandItem>
                 <CommandItem
                   className="justify-between gap-2"
@@ -215,7 +213,7 @@ export function SearchDialog() {
                 >
                   <div className="flex items-center gap-2">
                     <Keyboard className="h-4 w-4 text-muted-foreground" />
-                    <span>{t("shortcuts.title")}</span>
+                    <span>键盘快捷键</span>
                   </div>
                   <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
                     ?

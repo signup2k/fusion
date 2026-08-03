@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { translate, useI18n } from "@/lib/i18n";
 import { oidcAPI, sessionAPI } from "@/lib/api";
 import { defaultArticleFilter } from "@/lib/article-filter";
 
@@ -13,7 +12,6 @@ export const Route = createLazyFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { t } = useI18n();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [password, setPassword] = useState("");
@@ -24,7 +22,7 @@ function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("error") === "oidc_failed") {
-      toast.error(translate("login.oidcFailed"));
+      toast.error("OIDC 登录失败，请重试。");
       window.history.replaceState({}, "", "/login");
     }
 
@@ -51,7 +49,7 @@ function LoginPage() {
         params: { filter: defaultArticleFilter },
       });
     } catch {
-      toast.error(t("login.invalidPassword"));
+      toast.error("密码无效");
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +63,7 @@ function LoginPage() {
         window.location.href = res.data.auth_url;
       }
     } catch {
-      toast.error(t("login.oidcStartFailed"));
+      toast.error("启动 OIDC 登录失败");
       setOidcLoading(false);
     }
   };
@@ -76,14 +74,14 @@ function LoginPage() {
         <div className="flex flex-col items-center gap-2">
           <img
             src="/icon-96.png"
-            alt={t("common.fusionLogo")}
+            alt="Fusion 标志"
             width={48}
             height={48}
             className="h-12 w-12 rounded-xl"
           />
           <h1 className="text-2xl font-bold">Fusion</h1>
           <p className="text-sm text-muted-foreground">
-            {t("login.enterPassword")}
+            输入密码以继续
           </p>
         </div>
 
@@ -96,7 +94,7 @@ function LoginPage() {
               onClick={handleOIDCLogin}
               disabled={oidcLoading}
             >
-              {oidcLoading ? t("login.oidcRedirecting") : t("login.oidcSignIn")}
+              {oidcLoading ? "跳转中..." : "使用 OIDC 登录"}
             </Button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -104,7 +102,7 @@ function LoginPage() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">
-                  {t("common.or")}
+                  或
                 </span>
               </div>
             </div>
@@ -116,17 +114,17 @@ function LoginPage() {
             id="login-password"
             name="password"
             type="password"
-            placeholder={t("login.passwordPlaceholder")}
+            placeholder="密码"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading}
             autoComplete="current-password"
             spellCheck={false}
-            aria-label={t("login.passwordPlaceholder")}
+            aria-label="密码"
             autoFocus={!isMobile}
           />
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? t("login.signingIn") : t("login.signIn")}
+            {isLoading ? "登录中..." : "登录"}
           </Button>
         </form>
       </div>

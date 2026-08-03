@@ -3,7 +3,7 @@
 > Per-file index for AI agents. Read the relevant entry BEFORE opening a file;
 > read only the line ranges the entry points to. Update entries after structural
 > changes (see the repo-map skill).
-> Last partial audit: 2026-07-31 | Files mapped: 48
+> Last partial audit: 2026-08-03 | Files mapped: 45
 
 ## Project documentation
 
@@ -209,25 +209,27 @@ Structure:
 - `applyOptimisticItemReadState` (L103): mirrors read-state changes into loaded article, detail, feed-count, and bookmark caches while deduplicating per-item count changes.
 - `useSetItemsReadState` (L244): performs read/unread mutations with rollback and no post-success refetch.
 - `useMarkAllItemsRead` (near L286): optimistically updates visible rows, then reconciles scope-wide read state.
-Gotchas: Unread-mode visibility is filtered from the optimistic item state by `useArticleList`; the cached source sequence remains intact for drawer navigation.
+Gotchas: Unread-mode visibility is filtered from the optimistic item state by `useArticleList`; the cached source sequence remains intact for expanded-reader navigation.
 
 ### frontend/src/hooks/use-article-list.ts (~92 lines, TypeScript, map-updated 2026-07-28)
 
 Purpose: Selects and normalizes the paginated article source for all, unread, and starred list modes.
 Structure:
 
-- `useArticleList` (L17): routes item/bookmark queries, filters optimistic read items from unread lists, and exposes the unfiltered cached sequence for drawer navigation.
+- `useArticleList` (L17): routes item/bookmark queries, filters optimistic read items from unread lists, and exposes the unfiltered cached sequence for expanded-reader navigation.
 Depends on: item queries, bookmark queries, article filter types.
 
-### frontend/src/components/article/article-list.tsx (~313 lines, TSX, map-updated 2026-07-31)
+### frontend/src/components/article/article-list.tsx (~340 lines, TSX, map-updated 2026-08-03)
 
-Purpose: Renders the article list header, filter tabs, near-viewport pagination, and read/star actions.
+Purpose: Renders the article list header, filter tabs, near-viewport pagination, read/star actions, and the inline-expansion keyboard wiring.
 Structure:
 
-- `ArticleList` (L22): derives URL scope, loads articles, and wires list interactions.
-- detail prefetch (near L70): warms full article content on pointer hover or keyboard focus.
-- load-more observer (near L80): fetches the next page before the fallback button reaches the viewport.
-- `handleMarkAllAsRead` (near L140): marks the complete current all/unread scope as read while optimistically updating visible rows.
+- `ArticleList` (L28): derives URL scope, loads articles, and wires list interactions.
+- detail prefetch (near L75): warms full article content on pointer hover or keyboard focus.
+- load-more observer (near L90): fetches the next page before the fallback button reaches the viewport.
+- article navigation (near L180): keeps j/k movement always active and binds m/s/o to the currently expanded article.
+- fallback reader (near L265): renders a standalone `ArticleExpanded` when the selected article is not part of the loaded list (e.g. opened from search).
+- `handleMarkAllAsRead` (near L190): marks the complete current all/unread scope as read while optimistically updating visible rows.
 
 ### frontend/src/queries/keys.ts (~63 lines, TypeScript, map-updated 2026-07-22)
 
@@ -266,7 +268,7 @@ Structure:
 
 - `AppearanceContent` (near L58): edits global font size, article page size, theme, and shortcut access; language switching is intentionally absent.
 - `SettingsDialog` (L286): owns responsive tab navigation and dialog layout.
-Depends on: persisted preference/UI stores, theme provider, Chinese message lookup, PWA install hook.
+Depends on: persisted preference/UI stores, theme provider, PWA install hook.
 
 ### frontend/src/components/feed/feed-list.tsx (~281 lines, TSX, map-updated 2026-07-28)
 
@@ -307,7 +309,7 @@ Purpose: Renders one sidebar feed row with selection, unread count, editing, and
 Structure:
 
 - `FeedItem` (L19): exposes accessible up/down controls in manual sort mode and disables boundary moves.
-Depends on: URL/UI stores, feed favicon, i18n.
+Depends on: URL/UI stores, feed favicon.
 
 ### frontend/src/index.css (~165 lines, CSS, map-updated 2026-07-17)
 
@@ -317,23 +319,7 @@ Structure:
 - root font-size presets (L133): maps the persisted `data-font-size` setting to 87.5%–125% scaling.
 - `.sidebar-typography` / `.typeset-article` (L149): relative typography that follows the global scale.
 
-## Frontend localization
-
-### frontend/src/lib/i18n.ts (~28 lines, TypeScript, map-updated 2026-07-25)
-
-Purpose: Provides typed Simplified Chinese message lookup and parameter interpolation to UI components.
-Structure:
-
-- `translate` (near L20): resolves a required Chinese message and interpolates named parameters.
-- `useI18n` (near L27): exposes the stable translator through the existing component contract.
-
-### frontend/src/lib/i18n/messages/index.ts (~1 line, TypeScript, map-updated 2026-07-25)
-
-Purpose: Exports the sole Simplified Chinese dictionary and its compile-time key union.
-
-### frontend/src/lib/i18n/messages/zh.ts (~204 lines, TypeScript, map-updated 2026-07-25)
-
-Purpose: Canonical and only UI dictionary; its keys define the compile-time `TranslationKey` union.
+## Frontend API types and article rendering
 
 ### frontend/src/lib/api/types.ts (~207 lines, TypeScript, map-updated 2026-07-31)
 
@@ -353,24 +339,24 @@ Structure:
 
 - `feedAPI` (L59): feed CRUD, discovery, batch creation, refresh-all, refresh-one, and check-one requests.
 
-### frontend/src/components/article/article-item.tsx (~183 lines, TSX, map-updated 2026-07-31)
+### frontend/src/components/article/article-item.tsx (~205 lines, TSX, map-updated 2026-08-03)
 
-Purpose: Renders one article row from lightweight preview data with title, extracted summary, metadata, prefetch triggers, and actions.
+Purpose: Renders one article row from lightweight preview data with title, extracted summary, metadata, prefetch triggers, hover read/star actions, an always-visible open action, and inline expansion of the selected article.
 Structure:
 
-- `ArticleItem` (L22): memoized article row that caches plain-text summary extraction and requests detail prefetch on hover/focus.
-Depends on: API `Item`, summary utility, feed favicon, i18n.
+- `ArticleItem` (L23): memoized article row that caches plain-text summary extraction, requests detail prefetch on hover/focus, and toggles selection on click/Enter/Space.
+- inline expansion (near L190): renders `ArticleExpanded` for the selected row and scrolls it into view.
+Depends on: API `Item`, summary utility, feed favicon, `ArticleExpanded`.
 
-### frontend/src/components/article/article-drawer.tsx (~400 lines, TSX, map-updated 2026-07-31)
+### frontend/src/components/article/article-expanded.tsx (~300 lines, TSX, map-updated 2026-08-03)
 
-Purpose: Renders the selected article's detailed reading drawer and navigation.
+Purpose: Renders the expanded reading view for the selected article inline below its list row, or standalone when the selection is outside the loaded list (e.g. opened from search).
 Structure:
 
-- `ArticleDrawer` (L35): resolves preview/detail/bookmark context and action state from the stable cached sequence.
-- processed content memo (near L88): sanitizes full HTML only when article content/link changes.
-- preview/uncached detail state (near L65/L200): fetches complete content and shows a loading skeleton or retry action when needed.
-- title/content rendering (near L265–L322): displays title and memoized sanitized HTML.
-Gotchas: The reading `ScrollArea` is keyed by article ID so article navigation always starts at the top.
+- `ArticleExpanded` (L36): resolves list-row or fetched detail content plus bookmark/feed context and renders the action toolbar, metadata, and sanitized HTML.
+- detail fetch (near L58): fetches complete content in starred mode or when the row only carries a preview; shows a loading skeleton or retry action otherwise.
+- auto-read effect (near L95): marks the expanded article read once, skipped in unread mode.
+Gotchas: Auto read-marking is skipped in unread mode so the expanded row does not immediately disappear from the filtered list.
 
 ### frontend/src/lib/content.ts (~151 lines, TypeScript, map-updated 2026-07-31)
 

@@ -6,8 +6,6 @@ import type { Feed } from "@/lib/api";
 import { FeedFavicon } from "@/components/feed/feed-favicon";
 import { ArrowDown, ArrowUp, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/lib/i18n";
-
 interface FeedItemProps {
   feed: Feed;
   manualSorting?: boolean;
@@ -23,7 +21,6 @@ export function FeedItem({
   canMoveDown = false,
   onMove,
 }: FeedItemProps) {
-  const { t } = useI18n();
   const { selectedFeedId, setSelectedFeed } = useUrlState();
   const { setEditFeedOpen } = useUIStore();
 
@@ -63,7 +60,7 @@ export function FeedItem({
               className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
               onClick={() => onMove?.("up")}
               disabled={!canMoveUp}
-              aria-label={t("feed.order.moveUp")}
+              aria-label="上移订阅"
             >
               <ArrowUp className="text-muted-foreground" />
             </Button>
@@ -73,7 +70,7 @@ export function FeedItem({
               className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
               onClick={() => onMove?.("down")}
               disabled={!canMoveDown}
-              aria-label={t("feed.order.moveDown")}
+              aria-label="下移订阅"
             >
               <ArrowDown className="text-muted-foreground" />
             </Button>
@@ -84,7 +81,7 @@ export function FeedItem({
           size="icon-xs"
           className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex"
           onClick={handleSettingsClick}
-          aria-label={t("feed.edit.title")}
+          aria-label="编辑订阅"
         >
           <Settings className="text-muted-foreground" />
         </Button>

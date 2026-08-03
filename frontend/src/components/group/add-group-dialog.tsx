@@ -11,13 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useI18n } from "@/lib/i18n";
 import { useUIStore } from "@/store";
 import { useCreateGroup } from "@/queries/groups";
 import { toast } from "sonner";
 
 export function AddGroupDialog() {
-  const { t } = useI18n();
   const isMobile = useIsMobile();
   const { isAddGroupOpen, setAddGroupOpen } = useUIStore();
   const createGroup = useCreateGroup();
@@ -32,9 +30,9 @@ export function AddGroupDialog() {
       await createGroup.mutateAsync(trimmed);
       setName("");
       setAddGroupOpen(false);
-      toast.success(t("group.toast.created"));
+      toast.success("分组已创建");
     } catch {
-      toast.error(t("group.toast.createFailed"));
+      toast.error("创建分组失败");
     }
   };
 
@@ -48,26 +46,26 @@ export function AddGroupDialog() {
     >
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{t("group.add.title")}</DialogTitle>
+          <DialogTitle>添加分组</DialogTitle>
           <DialogDescription>
-            {t("group.add.description")}
+            创建新分组以整理你的订阅。
           </DialogDescription>
         </DialogHeader>
         <div className="relative">
           <label htmlFor="add-group-name" className="sr-only">
-            {t("group.add.title")}
+            添加分组
           </label>
           <FolderPlus className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="add-group-name"
             name="group-name"
-            placeholder={t("group.add.placeholder")}
+            placeholder="分组名称"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             className="pl-10"
             autoComplete="off"
-            aria-label={t("group.add.placeholder")}
+            aria-label="分组名称"
             autoFocus={!isMobile}
           />
         </div>
@@ -77,13 +75,13 @@ export function AddGroupDialog() {
             onClick={() => setAddGroupOpen(false)}
             disabled={createGroup.isPending}
           >
-            {t("common.cancel")}
+            取消
           </Button>
           <Button
             onClick={handleCreate}
             disabled={!name.trim() || createGroup.isPending}
           >
-            {createGroup.isPending ? t("common.creating") : t("common.create")}
+            {createGroup.isPending ? "创建中..." : "创建"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,4 @@
 import { toast } from "sonner";
-import { translate } from "@/lib/i18n";
-
 const SW_URL = "/sw.js";
 const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 
@@ -16,12 +14,12 @@ function notifyInstallAvailability(): void {
 }
 
 function showUpdateToast(registration: ServiceWorkerRegistration): void {
-  toast.info(translate("pwa.update.title"), {
+  toast.info("发现更新", {
     id: "pwa-update",
-    description: translate("pwa.update.description"),
+    description: "重新加载以使用最新版本的 Fusion。",
     duration: Number.POSITIVE_INFINITY,
     action: {
-      label: translate("pwa.update.reload"),
+      label: "重新加载",
       onClick: () => {
         shouldReloadOnControllerChange = true;
         if (registration.waiting) {
@@ -103,7 +101,7 @@ export function registerPWA(): void {
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     notifyInstallAvailability();
-    toast.success(translate("pwa.toast.installed"));
+    toast.success("Fusion 已安装");
   });
 
   window.addEventListener("load", () => {

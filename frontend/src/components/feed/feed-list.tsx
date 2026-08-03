@@ -15,7 +15,6 @@ import { useGroups } from "@/queries/groups";
 import { useFeedLookup, useUnreadCounts } from "@/queries/feeds";
 import { useBookmarkLookup } from "@/queries/bookmarks";
 import { useUrlState } from "@/hooks/use-url-state";
-import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore, type FeedSort } from "@/store";
 import { FeedGroup } from "./feed-group";
@@ -24,7 +23,6 @@ import { FeedItem } from "./feed-item";
 const feedNameCollator = new Intl.Collator(undefined, { sensitivity: "base" });
 
 export function FeedList() {
-  const { t } = useI18n();
   const { data: groups = [], isLoading } = useGroups();
   const { feeds } = useFeedLookup();
   const { getTotalUnreadCount } = useUnreadCounts();
@@ -125,10 +123,10 @@ export function FeedList() {
   };
 
   const sortLabels: Record<FeedSort, string> = {
-    manual: t("feed.sort.manual"),
-    name: t("feed.sort.name"),
-    unread: t("feed.sort.unread"),
-    newest: t("feed.sort.newest"),
+    manual: "手工排序",
+    name: "按名称",
+    unread: "按未读数",
+    newest: "最近添加",
   };
 
   const topFilters: Array<{
@@ -139,19 +137,19 @@ export function FeedList() {
   }> = [
     {
       value: "unread",
-      label: t("article.filter.unread"),
+      label: "未读",
       count: totalUnread,
       icon: Inbox,
     },
     {
       value: "starred",
-      label: t("article.filter.starred"),
+      label: "已收藏",
       count: starredCount,
       icon: Star,
     },
     {
       value: "all",
-      label: t("article.filter.all"),
+      label: "全部",
       count: totalUnread,
       icon: Layers,
     },
@@ -197,7 +195,7 @@ export function FeedList() {
         {/* Feeds header */}
         <div className="mt-2 flex items-center justify-between px-2 py-1">
           <span className="text-[11px] font-medium text-muted-foreground">
-            {t("search.group.feeds")}
+            订阅源
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -205,7 +203,7 @@ export function FeedList() {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label={t("feed.sort.label")}
+                  aria-label="订阅排序"
                 >
                   <ArrowUpDown className="text-muted-foreground" />
                 </Button>
@@ -216,7 +214,7 @@ export function FeedList() {
                 value={feedSort}
                 onValueChange={(value) => setFeedSort(value)}
               >
-                <DropdownMenuLabel>{t("feed.sort.label")}</DropdownMenuLabel>
+                <DropdownMenuLabel>订阅排序</DropdownMenuLabel>
                 {Object.entries(sortLabels).map(([value, label]) => (
                   <DropdownMenuRadioItem key={value} value={value}>
                     {label}
