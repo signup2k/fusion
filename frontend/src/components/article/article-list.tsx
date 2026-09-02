@@ -49,6 +49,7 @@ export function ArticleList() {
 		feedId: selectedFeedId,
 		groupId: selectedGroupId,
 		articleFilter,
+		retainedUnreadItemId: selectedArticleId,
 	});
 
 	const { data: groups = [] } = useGroups();

@@ -12,6 +12,7 @@ interface ArticleListFilters {
   feedId: number | null;
   groupId: number | null;
   articleFilter: ArticleFilter;
+  retainedUnreadItemId?: number | null;
 }
 
 export function useArticleList(filters: ArticleListFilters) {
@@ -46,9 +47,17 @@ export function useArticleList(filters: ArticleListFilters) {
   const articles = useMemo(
     () =>
       !isStarredMode && filters.articleFilter === "unread"
-        ? cachedArticles.filter((item) => item.unread)
+        ? cachedArticles.filter(
+            (item) =>
+              item.unread || item.id === filters.retainedUnreadItemId,
+          )
         : cachedArticles,
-    [cachedArticles, filters.articleFilter, isStarredMode],
+    [
+      cachedArticles,
+      filters.articleFilter,
+      filters.retainedUnreadItemId,
+      isStarredMode,
+    ],
   );
 
   // Bookmark resolution for star state + un-starring. In starred mode every

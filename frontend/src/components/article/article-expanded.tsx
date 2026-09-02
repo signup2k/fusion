@@ -73,13 +73,9 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 			: "";
 	}, [resolved?.content, safeArticleLink]);
 
-	// Auto-mark as read on expand, except in unread mode where the row would
-	// immediately disappear from the filtered list while being read.
-	const autoMarkRead = articleFilter !== "unread";
 	const autoReadIdRef = useRef<number | null>(null);
 	useEffect(() => {
 		if (
-			!autoMarkRead ||
 			!resolved ||
 			resolved.id <= 0 ||
 			autoReadIdRef.current === resolved.id ||
@@ -92,7 +88,7 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 		void markRead.mutateAsync([resolved.id]).catch((error) => {
 			console.error("Failed to automatically mark article as read:", error);
 		});
-	}, [autoMarkRead, markRead, resolved]);
+	}, [markRead, resolved]);
 
 	const canToggleRead = resolved !== null && resolved.id > 0;
 

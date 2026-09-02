@@ -211,15 +211,15 @@ Structure:
 - `useMarkAllItemsRead` (near L286): optimistically updates visible rows, then reconciles scope-wide read state.
 Gotchas: Unread-mode visibility is filtered from the optimistic item state by `useArticleList`; the cached source sequence remains intact for expanded-reader navigation.
 
-### frontend/src/hooks/use-article-list.ts (~92 lines, TypeScript, map-updated 2026-07-28)
+### frontend/src/hooks/use-article-list.ts (~100 lines, TypeScript, map-updated 2026-09-02)
 
-Purpose: Selects and normalizes the paginated article source for all, unread, and starred list modes.
+Purpose: Selects and normalizes the paginated article source for all, unread, and starred list modes, retaining the currently open article in the unread view until navigation moves away.
 Structure:
 
-- `useArticleList` (L17): routes item/bookmark queries, filters optimistic read items from unread lists, and exposes the unfiltered cached sequence for expanded-reader navigation.
+- `useArticleList` (L17): routes item/bookmark queries, filters optimistic read items from unread lists except the currently open row, and exposes the unfiltered cached sequence for expanded-reader navigation.
 Depends on: item queries, bookmark queries, article filter types.
 
-### frontend/src/components/article/article-list.tsx (~340 lines, TSX, map-updated 2026-08-03)
+### frontend/src/components/article/article-list.tsx (~340 lines, TSX, map-updated 2026-09-02)
 
 Purpose: Renders the article list header, filter tabs, near-viewport pagination, read/star actions, and the inline-expansion keyboard wiring.
 Structure:
@@ -348,15 +348,15 @@ Structure:
 - inline expansion (near L190): renders `ArticleExpanded` for the selected row and scrolls it into view.
 Depends on: API `Item`, summary utility, feed favicon, `ArticleExpanded`.
 
-### frontend/src/components/article/article-expanded.tsx (~300 lines, TSX, map-updated 2026-08-03)
+### frontend/src/components/article/article-expanded.tsx (~300 lines, TSX, map-updated 2026-09-02)
 
 Purpose: Renders the expanded reading view for the selected article inline below its list row, or standalone when the selection is outside the loaded list (e.g. opened from search).
 Structure:
 
 - `ArticleExpanded` (L36): resolves list-row or fetched detail content plus bookmark/feed context and renders the action toolbar, metadata, and sanitized HTML.
 - detail fetch (near L58): fetches complete content in starred mode or when the row only carries a preview; shows a loading skeleton or retry action otherwise.
-- auto-read effect (near L95): marks the expanded article read once, skipped in unread mode.
-Gotchas: Auto read-marking is skipped in unread mode so the expanded row does not immediately disappear from the filtered list.
+- auto-read effect (near L80): marks every expanded unread article read once; the unread list temporarily retains the selected row until navigation moves away.
+Gotchas: The selected unread row is retained by `useArticleList`; changing or clearing the selection removes it after its optimistic read-state update.
 
 ### frontend/src/lib/content.ts (~151 lines, TypeScript, map-updated 2026-07-31)
 
