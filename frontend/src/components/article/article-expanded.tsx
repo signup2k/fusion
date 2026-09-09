@@ -6,6 +6,7 @@ import {
 	Star,
 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FeedFavicon } from "@/components/feed/feed-favicon";
 import { useArticleList } from "@/hooks/use-article-list";
@@ -24,9 +25,14 @@ interface ArticleExpandedProps {
 	// part of the loaded list (e.g. opened from search) and must be fetched.
 	article: Item | null;
 	articleId: number;
+	inline?: boolean;
 }
 
-export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
+export function ArticleExpanded({
+	article,
+	articleId,
+	inline = false,
+}: ArticleExpandedProps) {
 	const {
 		articleFilter,
 		selectedFeedId,
@@ -93,7 +99,13 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 	const canToggleRead = resolved !== null && resolved.id > 0;
 
 	const handleToggleRead = async () => {
-		if (!resolved || !canToggleRead) return;
+		if (
+			!resolved ||
+			!canToggleRead ||
+			markRead.isPending ||
+			markUnread.isPending
+		)
+			return;
 		try {
 			if (resolved.unread) {
 				await markRead.mutateAsync([resolved.id]);
@@ -102,6 +114,7 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 			}
 		} catch (error) {
 			console.error("Failed to toggle read status:", error);
+			toast.error("更新阅读状态失败，请重试");
 		}
 	};
 
@@ -121,6 +134,7 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 			}
 		} catch (error) {
 			console.error("Failed to toggle star:", error);
+			toast.error("更新收藏失败，请重试");
 		}
 	};
 
@@ -134,7 +148,11 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 
 	if (!resolved) {
 		return (
-			<div className="border-t px-4 py-4 sm:px-6">
+			<div
+				id={`article-content-${articleId}`}
+				className="border-t px-4 py-4 sm:px-6"
+				aria-busy={isArticleLoading}
+			>
 				{isArticleLoading ? (
 					<div className="space-y-5 py-2">
 						<div className="h-8 w-3/4 animate-pulse rounded bg-accent" />
@@ -162,7 +180,11 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 	}
 
 	return (
-		<div className="border-t px-4 pb-6 sm:px-6">
+		<section
+			id={`article-content-${articleId}`}
+			aria-label="文章正文"
+			className="border-t px-4 pb-6 sm:px-6"
+		>
 			{/* Action toolbar */}
 			<div className="flex items-center justify-between gap-2 py-3">
 				<div className="flex flex-wrap items-center gap-2">
@@ -170,7 +192,9 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 						variant="outline"
 						size="sm"
 						onClick={() => void handleToggleRead()}
-						disabled={!canToggleRead}
+						disabled={
+							!canToggleRead || markRead.isPending || markUnread.isPending
+						}
 						className="h-auto gap-1.5 px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground"
 					>
 						{resolved.unread ? (
@@ -193,6 +217,7 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 						{starred ? "取消收藏" : "收藏"}
 					</Button>
 					<Button
+						nativeButton={!safeArticleLink}
 						render={
 							safeArticleLink ? (
 								<a
@@ -222,55 +247,78 @@ export function ArticleExpanded({ article, articleId }: ArticleExpandedProps) {
 				</Button>
 			</div>
 
-			{/* Title and metadata */}
-			<div className="space-y-3">
-				<h1 className="text-[28px] font-bold leading-[1.3]">
-					{resolved.title}
-				</h1>
-				<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-					{resolved.feed_id > 0 ? (
-						<button
-							type="button"
-							onClick={() => setSelectedFeed(resolved.feed_id)}
-							className="flex max-w-48 items-center gap-1.5 rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
-						>
-							{feed && (
-								<FeedFavicon
-									src={getFaviconUrl(feed.link, feed.site_url)}
-									className="h-3.5 w-3.5 rounded-sm"
-								/>
-							)}
-							<span className="truncate hover:underline">
-								{feed?.name ?? bookmark?.feed_name ?? "未知"}
+			{/* Standalone readers have no list header. */}
+			{!inline && (
+				<div className="space-y-3">
+					<h1 className="text-[28px] font-bold leading-[1.3]">
+						{resolved.title}
+					</h1>
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+						{resolved.feed_id > 0 ? (
+							<button
+								type="button"
+								onClick={() => setSelectedFeed(resolved.feed_id)}
+								className="flex max-w-48 items-center gap-1.5 rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
+							>
+								{feed && (
+									<FeedFavicon
+										src={getFaviconUrl(feed.link, feed.site_url)}
+										className="h-3.5 w-3.5 rounded-sm"
+									/>
+								)}
+								<span className="truncate hover:underline">
+									{feed?.name ?? bookmark?.feed_name ?? "未知"}
+								</span>
+							</button>
+						) : (
+							<span className="flex max-w-48 items-center gap-1.5 rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+								<span className="truncate">
+									{bookmark?.feed_name ?? "未知"}
+								</span>
 							</span>
-						</button>
-					) : (
-						<span className="flex max-w-48 items-center gap-1.5 rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-							<span className="truncate">{bookmark?.feed_name ?? "未知"}</span>
+						)}
+						<span className="text-muted-foreground">
+							{formatDate(resolved.pub_date)}
 						</span>
-					)}
-					<span className="text-muted-foreground">
-						{formatDate(resolved.pub_date)}
-					</span>
-					{safeArticleLink ? (
-						<a
-							href={safeArticleLink}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="truncate text-primary hover:underline"
-						>
-							{getLinkDomain(safeArticleLink)}
-						</a>
-					) : null}
+						{safeArticleLink ? (
+							<a
+								href={safeArticleLink}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="truncate text-primary hover:underline"
+							>
+								{getLinkDomain(safeArticleLink)}
+							</a>
+						) : null}
+					</div>
 				</div>
-			</div>
+			)}
 
-			<div
-				className="typeset typeset-article mt-4 min-w-0 max-w-none"
-				dangerouslySetInnerHTML={{
-					__html: processedArticleContent,
-				}}
-			/>
-		</div>
+			{processedArticleContent ? (
+				<div
+					className="typeset typeset-article mx-auto mt-4 min-w-0 max-w-[72ch]"
+					dangerouslySetInnerHTML={{
+						__html: processedArticleContent,
+					}}
+				/>
+			) : (
+				<p className="py-8 text-center text-sm text-muted-foreground">
+					此订阅未提供正文，可点击「原文」继续阅读。
+				</p>
+			)}
+			{processedArticleContent && (
+				<div className="mt-8 flex justify-center border-t pt-4">
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => setSelectedArticle(null)}
+						className="text-muted-foreground"
+					>
+						<ChevronUp className="size-4" />
+						收起文章
+					</Button>
+				</div>
+			)}
+		</section>
 	);
 }

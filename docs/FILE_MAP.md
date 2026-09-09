@@ -213,6 +213,8 @@ Gotchas: Unread-mode visibility is filtered from the optimistic item state by `u
 
 ### frontend/src/hooks/use-article-list.ts (~100 lines, TypeScript, map-updated 2026-09-02)
 
+Update (2026-09-09): Exposes list and pagination error flags plus a retry callback for both item and bookmark sources.
+
 Purpose: Selects and normalizes the paginated article source for all, unread, and starred list modes, retaining the currently open article in the unread view until navigation moves away.
 Structure:
 
@@ -220,6 +222,8 @@ Structure:
 Depends on: item queries, bookmark queries, article filter types.
 
 ### frontend/src/components/article/article-list.tsx (~340 lines, TSX, map-updated 2026-09-02)
+
+Update (2026-09-09): Keeps filter tabs stable and distinguishes initial, background-refresh, pagination failures, and filter-specific empty states. Stops automatic pagination after a failure.
 
 Purpose: Renders the article list header, filter tabs, near-viewport pagination, read/star actions, and the inline-expansion keyboard wiring.
 Structure:
@@ -341,6 +345,8 @@ Structure:
 
 ### frontend/src/components/article/article-item.tsx (~205 lines, TSX, map-updated 2026-08-03)
 
+Update (2026-09-09): Uses a native disclosure button separated from action buttons, keeps the selected title readable, hides duplicate row actions while expanded, and respects reduced motion.
+
 Purpose: Renders one article row from lightweight preview data with title, extracted summary, metadata, prefetch triggers, hover read/star actions, an always-visible open action, and inline expansion of the selected article.
 Structure:
 
@@ -349,6 +355,8 @@ Structure:
 Depends on: API `Item`, summary utility, feed favicon, `ArticleExpanded`.
 
 ### frontend/src/components/article/article-expanded.tsx (~300 lines, TSX, map-updated 2026-09-02)
+
+Update (2026-09-09): The inline flag omits duplicate title/metadata; standalone readers preserve them. Constrains body width, reports empty content and mutation failures, and offers a bottom collapse control.
 
 Purpose: Renders the expanded reading view for the selected article inline below its list row, or standalone when the selection is outside the loaded list (e.g. opened from search).
 Structure:
@@ -359,6 +367,8 @@ Structure:
 Gotchas: The selected unread row is retained by `useArticleList`; changing or clearing the selection removes it after its optimistic read-state update.
 
 ### frontend/src/lib/content.ts (~151 lines, TypeScript, map-updated 2026-07-31)
+
+Update (2026-09-09): Preserves common semantic inline markup and table spans; wraps sanitized tables in focusable horizontal scroll regions.
 
 Purpose: Sanitizes article HTML, resolves safe external URLs, removes tracking pixels, and prepares images for efficient display.
 Structure:
@@ -433,3 +443,33 @@ Gotchas: Bilingual search-result display or Chinese search requires explicit API
 The remaining authentication, feed/group/bookmark handlers and stores, tests,
 frontend routes/state/UI primitives, deployment files, and general documentation
 are not yet mapped. Map them lazily when a task first touches them.
+
+## Reading experience follow-up (2026-09-09)
+
+### frontend/src/components/search/search-dialog.tsx
+
+Purpose: Debounces search input and uses TanStack Query for cancellation, cached results, and recoverable failures. Dialog labels live inside its content.
+
+### frontend/src/hooks/use-keyboard.ts
+
+Purpose: Owns global and article shortcuts; skips IME composition, active dialogs/menus, and native arrow-key controls.
+
+### frontend/src/hooks/use-mobile.ts
+
+Purpose: Subscribes to a shared media query with useSyncExternalStore to avoid incorrect initial mobile layout and effect-driven rerenders.
+
+### frontend/src/components/feed/edit-feed-dialog.tsx
+
+Purpose: Mounts a feed-keyed edit form initialized from the selected feed. Closing unmounts draft state; reopening restores saved values.
+
+### frontend/src/queries/bookmarks.ts
+
+Update: Starred item queries expose initial/pagination error status and retry without changing API or persistence formats.
+
+### frontend/package.json and frontend/pnpm-lock.yaml
+
+Update: Pin TypeScript to 6.0.3, whose JavaScript compiler API works with the installed typescript-eslint parser. TypeScript 7.0.2 caused ESLint to crash before checking source.
+
+### docs/reader-ux-verification.md
+
+Purpose: Records reading-flow changes, verification scope, and remaining visual QA limitations.

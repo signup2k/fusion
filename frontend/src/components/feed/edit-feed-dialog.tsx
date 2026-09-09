@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { AlertCircle, ChevronDown, Save, Trash2, X } from "lucide-react";
 import {
 	Dialog,
@@ -31,23 +31,32 @@ import {
 import { useUIStore } from "@/store";
 import { useGroups } from "@/queries/groups";
 import { useUpdateFeed, useDeleteFeed } from "@/queries/feeds";
-import type { UpdateFeedRequest } from "@/lib/api";
+import type { Feed, UpdateFeedRequest } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function EditFeedDialog() {
-	const { isEditFeedOpen, editingFeed, setEditFeedOpen } = useUIStore();
+	const editingFeed = useUIStore((state) => state.editingFeed);
+	return editingFeed ? (
+		<EditFeedForm key={editingFeed.id} editingFeed={editingFeed} />
+	) : null;
+}
+
+function EditFeedForm({ editingFeed }: { editingFeed: Feed }) {
+	const { isEditFeedOpen, setEditFeedOpen } = useUIStore();
 	const { data: groups = [] } = useGroups();
 	const updateFeedMutation = useUpdateFeed();
 	const deleteFeedMutation = useDeleteFeed();
 
-	const [url, setUrl] = useState("");
-	const [name, setName] = useState("");
-	const [groupId, setGroupId] = useState<string>("");
-	const [proxy, setProxy] = useState("");
-	const [suspended, setSuspended] = useState(false);
-	const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+	const [url, setUrl] = useState(editingFeed.link);
+	const [name, setName] = useState(editingFeed.name);
+	const [groupId, setGroupId] = useState(String(editingFeed.group_id));
+	const [proxy, setProxy] = useState(editingFeed.proxy ?? "");
+	const [suspended, setSuspended] = useState(editingFeed.suspended);
+	const [isAdvancedOpen, setIsAdvancedOpen] = useState(
+		Boolean(editingFeed.proxy),
+	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -55,18 +64,6 @@ export function EditFeedDialog() {
 		useState(false);
 	const urlInputRef = useRef<HTMLInputElement>(null);
 	const isMobile = useIsMobile();
-
-	useEffect(() => {
-		if (editingFeed) {
-			setUrl(editingFeed.link);
-			setName(editingFeed.name);
-			setGroupId(editingFeed.group_id.toString());
-			setProxy(editingFeed.proxy ?? "");
-			setSuspended(editingFeed.suspended);
-			setIsAdvancedOpen(!!editingFeed.proxy);
-			setIsMobileErrorTooltipOpen(false);
-		}
-	}, [editingFeed]);
 
 	const resetForm = () => {
 		setUrl("");

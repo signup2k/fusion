@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileText, Keyboard, Loader2, Search, Settings } from "lucide-react";
 import { getFaviconUrl } from "@/lib/api/favicon";
 import { searchAPI } from "@/lib/api";
-import type { SearchFeed, SearchItem } from "@/lib/api/types";
 import {
   Command,
   CommandEmpty,
@@ -33,53 +33,28 @@ export function SearchDialog() {
   const { setSelectedFeed, setSelectedArticle } = useUrlState();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [feeds, setFeeds] = useState<SearchFeed[]>([]);
-  const [items, setItems] = useState<SearchItem[]>([]);
-
+  const normalizedQuery = query.trim();
   useEffect(() => {
-    if (!query.trim()) {
-      setDebouncedQuery("");
-      setFeeds([]);
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setFeeds([]);
-    setItems([]);
-    const timer = setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 200);
+    const timer = setTimeout(() => setDebouncedQuery(normalizedQuery), 200);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [normalizedQuery]);
 
-  useEffect(() => {
-    const normalizedQuery = debouncedQuery.trim();
-    if (!normalizedQuery || normalizedQuery !== query.trim()) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    searchAPI
-      .search(normalizedQuery, 10, controller.signal)
-      .then((res) => {
-        setFeeds(res.data?.feeds ?? []);
-        setItems(res.data?.items ?? []);
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setFeeds([]);
-        setItems([]);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [debouncedQuery, query]);
+  const search = useQuery({
+    queryKey: ["search", debouncedQuery],
+    queryFn: ({ signal }) => searchAPI.search(debouncedQuery, 10, signal),
+    enabled:
+      isSearchOpen &&
+      Boolean(debouncedQuery) &&
+      normalizedQuery === debouncedQuery,
+    retry: false,
+  });
+  const waiting = normalizedQuery !== debouncedQuery;
+  const loading = Boolean(normalizedQuery) && (waiting || search.isFetching);
+  const failed = !waiting && search.isError;
+  const feeds =
+    waiting || !normalizedQuery ? [] : (search.data?.data?.feeds ?? []);
+  const items =
+    waiting || !normalizedQuery ? [] : (search.data?.data?.items ?? []);
 
   const handleSelectFeed = (feedId: number) => {
     setSelectedFeed(feedId);
@@ -104,9 +79,6 @@ export function SearchDialog() {
     if (!open) {
       setQuery("");
       setDebouncedQuery("");
-      setFeeds([]);
-      setItems([]);
-      setLoading(false);
     }
     setSearchOpen(open);
   };
@@ -118,11 +90,11 @@ export function SearchDialog() {
 
   return (
     <Dialog open={isSearchOpen} onOpenChange={handleOpenChange}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>搜索</DialogTitle>
-        <DialogDescription>搜索订阅源和文章</DialogDescription>
-      </DialogHeader>
       <DialogContent className="overflow-hidden p-0" showCloseButton={false}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>搜索</DialogTitle>
+          <DialogDescription>搜索订阅源和文章</DialogDescription>
+        </DialogHeader>
         <Command
           shouldFilter={false}
           className="[&_[cmdk-group-heading]]:text-muted-foreground **:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
@@ -133,18 +105,34 @@ export function SearchDialog() {
             onValueChange={setQuery}
           />
           <CommandList>
-            {loading && debouncedQuery && (
+            {loading && query.trim() && (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             )}
 
+            {failed && !loading && (
+              <div
+                role="alert"
+                className="flex flex-col items-center gap-3 py-6"
+              >
+                <p className="text-sm text-muted-foreground">
+                  搜索失败，请检查网络后重试。
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void search.refetch()}
+                >
+                  重试搜索
+                </Button>
+              </div>
+            )}
             {!loading &&
+              !failed &&
               debouncedQuery &&
               feeds.length === 0 &&
-              items.length === 0 && (
-                <CommandEmpty>未找到结果。</CommandEmpty>
-              )}
+              items.length === 0 && <CommandEmpty>未找到结果。</CommandEmpty>}
 
             {feeds.length > 0 && (
               <CommandGroup heading="订阅源">

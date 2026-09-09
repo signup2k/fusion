@@ -27,7 +27,10 @@ import { usePreferencesStore } from "@/store";
 const BOOKMARK_LOOKUP_PAGE_SIZE = 100;
 
 type BookmarkListResponse = ListAPIResponse<Bookmark>;
-export type BookmarksInfiniteData = InfiniteData<BookmarkListResponse, string | null>;
+export type BookmarksInfiniteData = InfiniteData<
+  BookmarkListResponse,
+  string | null
+>;
 
 export function resolveBookmarkItemId(bookmark: Bookmark): number {
   return bookmark.item_id ?? -bookmark.id;
@@ -104,6 +107,9 @@ export interface StarredItemsResult {
   bookmarks: Bookmark[];
   hasNextPage: boolean;
   isLoading: boolean;
+  isError: boolean;
+  isFetchNextPageError: boolean;
+  refetch: () => void;
   isFetchingNextPage: boolean;
   fetchNextPage: () => void;
 }
@@ -143,15 +149,16 @@ export function useStarredItems(
     bookmarks,
     hasNextPage: query.hasNextPage,
     isLoading: query.isLoading,
+    isError: query.isError,
+    isFetchNextPageError: query.isFetchNextPageError,
+    refetch: () => void query.refetch(),
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: () => void query.fetchNextPage(),
   };
 }
 
 interface BookmarkMutationContext {
-  previousLists: Array<
-    [readonly unknown[], BookmarksInfiniteData | undefined]
-  >;
+  previousLists: Array<[readonly unknown[], BookmarksInfiniteData | undefined]>;
 }
 
 function snapshotBookmarkLists(qc: QueryClient) {

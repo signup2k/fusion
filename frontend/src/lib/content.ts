@@ -7,6 +7,15 @@ const ALLOWED_TAGS = [
   "p",
   "br",
   "strong",
+  "b",
+  "i",
+  "sup",
+  "sub",
+  "del",
+  "mark",
+  "abbr",
+  "caption",
+  "tfoot",
   "em",
   "u",
   "s",
@@ -49,6 +58,11 @@ const ALLOWED_ATTR = [
   "height",
   "loading",
   "decoding",
+  "colspan",
+  "rowspan",
+  "scope",
+  "start",
+  "type",
 ];
 
 // Tags that are meaningful even when empty
@@ -83,7 +97,10 @@ function isEmptyElement(el: Element): boolean {
   return text.trim().length === 0;
 }
 
-function sanitizeAnchors(root: DocumentFragment, articleUrl: string | null): void {
+function sanitizeAnchors(
+  root: DocumentFragment,
+  articleUrl: string | null,
+): void {
   for (const node of root.querySelectorAll("a")) {
     const href = node.getAttribute("href");
     const safeHref = resolveSafeExternalUrl(href, articleUrl);
@@ -100,10 +117,16 @@ function sanitizeAnchors(root: DocumentFragment, articleUrl: string | null): voi
   }
 }
 
-function sanitizeImages(root: DocumentFragment, articleUrl: string | null): void {
+function sanitizeImages(
+  root: DocumentFragment,
+  articleUrl: string | null,
+): void {
   for (const node of root.querySelectorAll("img")) {
     const img = node as HTMLImageElement;
-    const safeSrc = resolveSafeExternalUrl(node.getAttribute("src"), articleUrl);
+    const safeSrc = resolveSafeExternalUrl(
+      node.getAttribute("src"),
+      articleUrl,
+    );
     if (!safeSrc) {
       img.remove();
       continue;
@@ -144,6 +167,16 @@ export function processArticleContent(
   sanitizeAnchors(fragment, safeArticleUrl);
   sanitizeImages(fragment, safeArticleUrl);
   removeEmptyWrappers(fragment);
+
+  for (const table of fragment.querySelectorAll("table")) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "typeset-scroll";
+    wrapper.tabIndex = 0;
+    wrapper.setAttribute("role", "region");
+    wrapper.setAttribute("aria-label", "文章表格，可横向滚动");
+    table.replaceWith(wrapper);
+    wrapper.appendChild(table);
+  }
 
   const container = document.createElement("div");
   container.appendChild(fragment);

@@ -17,7 +17,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
     return true;
   }
 
-  return target.closest("[contenteditable='true'], [data-hotkey-ignore='true']") !== null;
+  return (
+    target.closest("[contenteditable='true'], [data-hotkey-ignore='true']") !==
+    null
+  );
 }
 
 interface ArticleNavigationOptions {
@@ -98,7 +101,7 @@ export function useKeyboardShortcuts() {
     function handleKeyDown(event: KeyboardEvent) {
       const state = latestStateRef.current;
 
-      if (event.defaultPrevented) {
+      if (event.defaultPrevented || event.isComposing) {
         return;
       }
 
@@ -116,6 +119,15 @@ export function useKeyboardShortcuts() {
       if ((event.metaKey || event.ctrlKey) && event.key === ",") {
         event.preventDefault();
         state.setSettingsOpen(true);
+        resetPrefix();
+        return;
+      }
+
+      if (
+        document.querySelector(
+          '[role="dialog"], [role="alertdialog"], [role="menu"]',
+        )
+      ) {
         resetPrefix();
         return;
       }
@@ -296,9 +308,22 @@ export function useArticleNavigation(
         return;
       }
 
-      if (event.defaultPrevented) {
+      if (event.defaultPrevented || event.isComposing) {
         return;
       }
+
+      if (
+        document.querySelector(
+          '[role="dialog"], [role="alertdialog"], [role="menu"]',
+        )
+      )
+        return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest('button, a, [role="tab"], [role="combobox"]') &&
+        event.key.startsWith("Arrow")
+      )
+        return;
 
       // Don't handle navigation keys while typing in form fields
       if (isTypingTarget(event.target)) {

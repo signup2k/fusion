@@ -48,8 +48,7 @@ export function useArticleList(filters: ArticleListFilters) {
     () =>
       !isStarredMode && filters.articleFilter === "unread"
         ? cachedArticles.filter(
-            (item) =>
-              item.unread || item.id === filters.retainedUnreadItemId,
+            (item) => item.unread || item.id === filters.retainedUnreadItemId,
           )
         : cachedArticles,
     [
@@ -67,14 +66,12 @@ export function useArticleList(filters: ArticleListFilters) {
     ? starred.bookmarks
     : lookup.bookmarks;
   const bookmarkByItemId = useMemo(
-    () =>
-      new Map(bookmarkSource.map((b) => [resolveBookmarkItemId(b), b])),
+    () => new Map(bookmarkSource.map((b) => [resolveBookmarkItemId(b), b])),
     [bookmarkSource],
   );
 
   const isItemStarred = useCallback(
-    (itemId: number) =>
-      isStarredMode ? true : bookmarkByItemId.has(itemId),
+    (itemId: number) => (isStarredMode ? true : bookmarkByItemId.has(itemId)),
     [isStarredMode, bookmarkByItemId],
   );
 
@@ -91,6 +88,11 @@ export function useArticleList(filters: ArticleListFilters) {
     isLoadingMore: isStarredMode
       ? starred.isFetchingNextPage
       : itemsQuery.isFetchingNextPage,
+    isError: isStarredMode ? starred.isError : itemsQuery.isError,
+    isLoadMoreError: isStarredMode
+      ? starred.isFetchNextPageError
+      : itemsQuery.isFetchNextPageError,
+    refetch: isStarredMode ? starred.refetch : () => void itemsQuery.refetch(),
     isStarredMode,
     fetchNextPage: isStarredMode
       ? starred.fetchNextPage

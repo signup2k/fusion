@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckCheck, Loader2 } from "lucide-react";
@@ -42,6 +43,9 @@ export function ArticleList() {
 		hasMore,
 		isLoading,
 		isLoadingMore,
+		isError,
+		isLoadMoreError,
+		refetch,
 		fetchNextPage,
 		isItemStarred,
 		getBookmarkByItemId,
@@ -83,7 +87,7 @@ export function ArticleList() {
 
 	useEffect(() => {
 		const loadMore = loadMoreRef.current;
-		if (!loadMore || !hasMore || isLoadingMore) return;
+		if (!loadMore || !hasMore || isLoadingMore || isError) return;
 
 		const observer = new IntersectionObserver(
 			([entry]) => {
@@ -96,7 +100,7 @@ export function ArticleList() {
 		observer.observe(loadMore);
 
 		return () => observer.disconnect();
-	}, [fetchNextPage, hasMore, isLoadingMore]);
+	}, [fetchNextPage, hasMore, isLoadingMore, isError]);
 
 	const articleIds = articles.map((a) => a.id);
 
@@ -132,6 +136,7 @@ export function ArticleList() {
 				}
 			} catch (error) {
 				console.error("Failed to toggle read status:", error);
+				toast.error("更新阅读状态失败，请重试");
 			}
 		},
 		[markItemsReadAsync, markItemsUnreadAsync],
@@ -153,6 +158,7 @@ export function ArticleList() {
 				await createBookmarkAsync(article);
 			} catch (error) {
 				console.error("Failed to toggle star:", error);
+				toast.error("更新收藏失败，请重试");
 			}
 		},
 		[
@@ -203,6 +209,7 @@ export function ArticleList() {
 			});
 		} catch (error) {
 			console.error("Failed to mark all as read:", error);
+			toast.error("全部标为已读失败，请重试");
 		}
 	};
 
@@ -234,7 +241,7 @@ export function ArticleList() {
 			{/* Article area with filter tabs */}
 			<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-6">
 				{/* Filter tabs - hidden when no articles exist */}
-				{!hasNoFeeds && (articles.length > 0 || articleFilter !== "all") && (
+				{!hasNoFeeds && (
 					<Tabs
 						value={articleFilter}
 						onValueChange={(v) => setArticleFilter(v as ArticleFilter)}
@@ -249,7 +256,18 @@ export function ArticleList() {
 
 				{/* Article list */}
 				<ScrollArea className="min-h-0 flex-1">
-					<div>
+					<div className="mx-auto w-full max-w-5xl">
+						{isError && articles.length > 0 && !isLoadMoreError && (
+							<div
+								role="alert"
+								className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm text-muted-foreground"
+							>
+								<span>更新失败，当前显示上次加载的文章。</span>
+								<Button variant="outline" size="sm" onClick={() => refetch()}>
+									重试更新
+								</Button>
+							</div>
+						)}
 						{/* Selected article outside the loaded list (e.g. opened from
                     search): show the reader on its own instead of a row. */}
 						{selectedArticleId !== null &&
@@ -266,7 +284,19 @@ export function ArticleList() {
 									/>
 								))}
 							</div>
-						) : articles.length === 0 ? (
+						) : isError && articles.length === 0 ? (
+							<div
+								role="alert"
+								className="flex flex-col items-center gap-3 py-12 text-center"
+							>
+								<p className="text-sm text-muted-foreground">
+									文章加载失败，请检查网络后重试。
+								</p>
+								<Button variant="outline" size="sm" onClick={() => refetch()}>
+									重新加载
+								</Button>
+							</div>
+						) : articles.length === 0 && selectedArticleId === null ? (
 							hasNoFeeds ? (
 								<div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
 									<p className="text-sm text-muted-foreground">
@@ -282,7 +312,13 @@ export function ArticleList() {
 								</div>
 							) : (
 								<div className="flex flex-col items-center justify-center py-12 text-center">
-									<p className="text-sm text-muted-foreground">未找到文章</p>
+									<p className="text-sm text-muted-foreground">
+										{articleFilter === "unread"
+											? "未读文章已全部读完"
+											: articleFilter === "starred"
+												? "暂无收藏，点击文章的星标即可收藏"
+												: "暂无文章"}
+									</p>
 								</div>
 							)
 						) : (
@@ -310,7 +346,15 @@ export function ArticleList() {
 									);
 								})}
 								{hasMore && (
-									<div ref={loadMoreRef} className="flex justify-center py-4">
+									<div
+										ref={loadMoreRef}
+										className="flex flex-col items-center gap-2 py-4"
+									>
+										{isLoadMoreError && (
+											<p role="alert" className="text-sm text-muted-foreground">
+												加载更多失败，已加载的文章仍可阅读。
+											</p>
+										)}
 										<Button
 											variant="outline"
 											size="sm"
@@ -321,7 +365,11 @@ export function ArticleList() {
 											{isLoadingMore && (
 												<Loader2 className="h-4 w-4 animate-spin" />
 											)}
-											{isLoadingMore ? "加载中..." : "加载更多"}
+											{isLoadingMore
+												? "加载中..."
+												: isLoadMoreError
+													? "重试加载"
+													: "加载更多"}
 										</Button>
 									</div>
 								)}
