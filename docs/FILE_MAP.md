@@ -243,15 +243,15 @@ Structure:
 - `normalizeItemFilters` (L12): converts optional list filters into stable query-key values.
 - `queryKeys` (L39): defines hierarchical keys used for cache reads, invalidation, and optimistic updates.
 
-### frontend/src/store/preferences.ts (~143 lines, TypeScript, map-updated 2026-07-25)
+### frontend/src/store/preferences.ts (~154 lines, TypeScript, map-updated 2026-09-15)
 
-Purpose: Owns persisted font/page-size, feed/folder ordering, and folder-expansion preferences and defensively validates restored values.
+Purpose: Owns persisted font/page-size, article-image visibility, feed/folder ordering, and folder-expansion preferences and defensively validates restored values.
 Structure:
 
-- preference option types (near L4): article page sizes, font sizes, and feed sort modes.
+- preference option types (near L4): article page sizes, font sizes, and feed sort modes; image visibility is a persisted boolean.
 - normalization helpers (near L24): sanitize persisted scalar, manual ID-order lists, and per-group expansion values.
 - `PreferencesState` / `usePreferencesStore` (near L71): Zustand store persisted under `fusion-preferences`.
-Gotchas: New persisted values must be included in both `partialize` and the defensive `merge` normalization.
+Gotchas: New persisted values must be included in both `partialize` and the defensive `merge` normalization; missing image visibility data defaults to showing images.
 
 ### frontend/src/store/index.ts (~7 lines, TypeScript, map-updated 2026-07-17)
 
@@ -265,12 +265,12 @@ Structure:
 - preference bootstrap/subscription (near L20): applies `lang="zh-CN"` and the persisted `data-font-size` to the root document element.
 - React application mount (L39): composes query, theme, router, and toast providers.
 
-### frontend/src/components/settings/settings-dialog.tsx (~306 lines, TSX, map-updated 2026-07-25)
+### frontend/src/components/settings/settings-dialog.tsx (~335 lines, TSX, map-updated 2026-09-15)
 
 Purpose: Renders the Appearance and About settings tabs.
 Structure:
 
-- `AppearanceContent` (near L58): edits global font size, article page size, theme, and shortcut access; language switching is intentionally absent.
+- `AppearanceContent` (near L58): edits global font size, article page size, article-image visibility, theme, and shortcut access; language switching is intentionally absent.
 - `SettingsDialog` (L286): owns responsive tab navigation and dialog layout.
 Depends on: persisted preference/UI stores, theme provider, PWA install hook.
 
@@ -354,26 +354,26 @@ Structure:
 - inline expansion (near L190): renders `ArticleExpanded` for the selected row and scrolls it into view.
 Depends on: API `Item`, summary utility, feed favicon, `ArticleExpanded`.
 
-### frontend/src/components/article/article-expanded.tsx (~300 lines, TSX, map-updated 2026-09-02)
+### frontend/src/components/article/article-expanded.tsx (~330 lines, TSX, map-updated 2026-09-15)
 
 Update (2026-09-09): The inline flag omits duplicate title/metadata; standalone readers preserve them. Constrains body width, reports empty content and mutation failures, and offers a bottom collapse control.
 
-Purpose: Renders the expanded reading view for the selected article inline below its list row, or standalone when the selection is outside the loaded list (e.g. opened from search).
+Purpose: Renders the expanded reading view for the selected article inline below its list row, or standalone when the selection is outside the loaded list (e.g. opened from search), with the persisted article-image preference applied.
 Structure:
 
 - `ArticleExpanded` (L36): resolves list-row or fetched detail content plus bookmark/feed context and renders the action toolbar, metadata, and sanitized HTML.
 - detail fetch (near L58): fetches complete content in starred mode or when the row only carries a preview; shows a loading skeleton or retry action otherwise.
 - auto-read effect (near L80): marks every expanded unread article read once; the unread list temporarily retains the selected row until navigation moves away.
-Gotchas: The selected unread row is retained by `useArticleList`; changing or clearing the selection removes it after its optimistic read-state update.
+Gotchas: The selected unread row is retained by `useArticleList`; changing or clearing the selection removes it after its optimistic read-state update. When images are disabled, article `<img>` elements are removed before the content is mounted.
 
-### frontend/src/lib/content.ts (~151 lines, TypeScript, map-updated 2026-07-31)
+### frontend/src/lib/content.ts (~193 lines, TypeScript, map-updated 2026-09-15)
 
-Update (2026-09-09): Preserves common semantic inline markup and table spans; wraps sanitized tables in focusable horizontal scroll regions.
+Update (2026-09-09): Preserves common semantic inline markup and table spans; wraps sanitized tables in focusable horizontal scroll regions. When requested, article images are removed before the fragment is mounted.
 
 Purpose: Sanitizes article HTML, resolves safe external URLs, removes tracking pixels, and prepares images for efficient display.
 Structure:
 
-- `sanitizeImages` (near L85): rejects unsafe/tracking sources, preserves safe dimensions, and applies native lazy loading and asynchronous decoding.
+- `sanitizeImages` (near L120): removes all article images when disabled; otherwise rejects unsafe/tracking sources, preserves safe dimensions, and applies native lazy loading and asynchronous decoding.
 
 ### frontend/src/lib/utils.ts (~73 lines, TypeScript, map-updated 2026-07-28)
 

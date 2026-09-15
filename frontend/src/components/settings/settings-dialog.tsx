@@ -11,6 +11,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
 	articlePageSizeOptions,
 	fontSizeOptions,
@@ -71,7 +72,14 @@ function AppearanceContent() {
 	const { theme, setTheme } = useTheme();
 	const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
 	const setShortcutsOpen = useUIStore((s) => s.setShortcutsOpen);
-	const { articlePageSize, fontSize, setArticlePageSize, setFontSize } =
+	const {
+		articlePageSize,
+		fontSize,
+		showImages,
+		setArticlePageSize,
+		setFontSize,
+		setShowImages,
+	} =
 		usePreferencesStore();
 
 	return (
@@ -101,6 +109,27 @@ function AppearanceContent() {
 						))}
 					</SelectContent>
 				</Select>
+			</div>
+
+			{/* Article images */}
+			<div className="flex items-center justify-between">
+				<div className="space-y-1">
+					<label
+						htmlFor="settings-show-images"
+						className="text-sm font-medium"
+					>
+						显示文章图片
+					</label>
+					<p className="text-[13px] text-muted-foreground">
+						关闭后不加载文章中的图片
+					</p>
+				</div>
+				<Switch
+					id="settings-show-images"
+					checked={showImages}
+					onCheckedChange={setShowImages}
+					aria-label="显示文章图片"
+				/>
 			</div>
 
 			{/* Articles per load */}

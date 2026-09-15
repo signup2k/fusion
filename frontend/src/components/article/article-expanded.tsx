@@ -19,6 +19,7 @@ import { formatDate } from "@/lib/utils";
 import { useFeedLookup } from "@/queries/feeds";
 import { useCreateBookmark, useDeleteBookmark } from "@/queries/bookmarks";
 import { useItem, useMarkItemsRead, useMarkItemsUnread } from "@/queries/items";
+import { usePreferencesStore } from "@/store";
 
 interface ArticleExpandedProps {
 	// List-row data when expanded inline; null when the selected article is not
@@ -41,6 +42,7 @@ export function ArticleExpanded({
 		setSelectedFeed,
 	} = useUrlState();
 	const { getFeedById } = useFeedLookup();
+	const showImages = usePreferencesStore((state) => state.showImages);
 	const { isStarredMode, isItemStarred, getBookmarkByItemId } = useArticleList({
 		feedId: selectedFeedId,
 		groupId: selectedGroupId,
@@ -75,9 +77,13 @@ export function ArticleExpanded({
 	const processedArticleContent = useMemo(() => {
 		const content = resolved?.content ?? "";
 		return content
-			? processArticleContent(content, safeArticleLink ?? undefined)
+			? processArticleContent(
+					content,
+					safeArticleLink ?? undefined,
+					showImages,
+				)
 			: "";
-	}, [resolved?.content, safeArticleLink]);
+	}, [resolved?.content, safeArticleLink, showImages]);
 
 	const autoReadIdRef = useRef<number | null>(null);
 	useEffect(() => {

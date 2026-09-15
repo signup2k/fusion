@@ -120,7 +120,15 @@ function sanitizeAnchors(
 function sanitizeImages(
   root: DocumentFragment,
   articleUrl: string | null,
+  showImages: boolean,
 ): void {
+  if (!showImages) {
+    for (const node of root.querySelectorAll("img")) {
+      node.remove();
+    }
+    return;
+  }
+
   for (const node of root.querySelectorAll("img")) {
     const img = node as HTMLImageElement;
     const safeSrc = resolveSafeExternalUrl(
@@ -155,6 +163,7 @@ function removeEmptyWrappers(root: DocumentFragment): void {
 export function processArticleContent(
   html: string,
   articleUrl?: string,
+  showImages = true,
 ): string {
   const safeArticleUrl = toSafeExternalUrl(articleUrl);
   const fragment = purify.sanitize(html, {
@@ -165,7 +174,7 @@ export function processArticleContent(
   }) as DocumentFragment;
 
   sanitizeAnchors(fragment, safeArticleUrl);
-  sanitizeImages(fragment, safeArticleUrl);
+  sanitizeImages(fragment, safeArticleUrl, showImages);
   removeEmptyWrappers(fragment);
 
   for (const table of fragment.querySelectorAll("table")) {

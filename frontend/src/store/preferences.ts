@@ -22,6 +22,7 @@ const feedSortSet = new Set<string>(feedSortOptions);
 const defaultArticlePageSize: ArticlePageSize = 10;
 const defaultFontSize: AppFontSize = "default";
 const defaultFeedSort: FeedSort = "manual";
+const defaultShowImages = true;
 
 function normalizeArticlePageSize(size: number): ArticlePageSize {
   if (articlePageSizeSet.has(size)) {
@@ -45,6 +46,10 @@ function normalizeFeedSort(sort: string): FeedSort {
   }
 
   return defaultFeedSort;
+}
+
+function normalizeShowImages(value: unknown): boolean {
+  return typeof value === "boolean" ? value : defaultShowImages;
 }
 
 function normalizeIdOrder(order: unknown): number[] {
@@ -72,12 +77,14 @@ export interface PreferencesState {
   articlePageSize: ArticlePageSize;
   fontSize: AppFontSize;
   feedSort: FeedSort;
+  showImages: boolean;
   feedOrder: number[];
   groupOrder: number[];
   groupAutoExpand: Record<number, boolean>;
   setArticlePageSize: (size: number) => void;
   setFontSize: (size: string) => void;
   setFeedSort: (sort: string) => void;
+  setShowImages: (show: boolean) => void;
   setFeedOrder: (order: number[]) => void;
   setGroupOrder: (order: number[]) => void;
   setGroupAutoExpand: (groupId: number, autoExpand: boolean) => void;
@@ -89,6 +96,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       articlePageSize: defaultArticlePageSize,
       fontSize: defaultFontSize,
       feedSort: defaultFeedSort,
+      showImages: defaultShowImages,
       feedOrder: [],
       groupOrder: [],
       groupAutoExpand: {},
@@ -96,6 +104,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         set({ articlePageSize: normalizeArticlePageSize(size) }),
       setFontSize: (size) => set({ fontSize: normalizeFontSize(size) }),
       setFeedSort: (sort) => set({ feedSort: normalizeFeedSort(sort) }),
+      setShowImages: (show) => set({ showImages: normalizeShowImages(show) }),
       setFeedOrder: (order) => set({ feedOrder: normalizeIdOrder(order) }),
       setGroupOrder: (order) => set({ groupOrder: normalizeIdOrder(order) }),
       setGroupAutoExpand: (groupId, autoExpand) =>
@@ -113,6 +122,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         articlePageSize: state.articlePageSize,
         fontSize: state.fontSize,
         feedSort: state.feedSort,
+        showImages: state.showImages,
         feedOrder: state.feedOrder,
         groupOrder: state.groupOrder,
         groupAutoExpand: state.groupAutoExpand,
@@ -131,6 +141,7 @@ export const usePreferencesStore = create<PreferencesState>()(
           feedSort: normalizeFeedSort(
             persisted?.feedSort ?? currentState.feedSort,
           ),
+          showImages: normalizeShowImages(persisted?.showImages),
           feedOrder: normalizeIdOrder(persisted?.feedOrder),
           groupOrder: normalizeIdOrder(persisted?.groupOrder),
           groupAutoExpand: normalizeGroupAutoExpand(
