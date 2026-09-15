@@ -2,12 +2,12 @@ package pull
 
 import "strings"
 
-func itemPassesFilter(mode, rawKeywords, title, content string) bool {
+func itemPassesFilter(mode, rawKeywords, title string) bool {
 	if mode == "none" || mode == "" {
 		return true
 	}
 
-	haystack := strings.ToLower(title + "\n" + content)
+	haystack := strings.ToLower(title)
 	matched := false
 	for _, line := range strings.Split(rawKeywords, "\n") {
 		keyword := strings.ToLower(strings.TrimSpace(line))

@@ -866,7 +866,7 @@ components:
           enum: [none, blocklist, allowlist]
         filter_keywords:
           type: string
-          description: One case-insensitive keyword per line; matches article title and content.
+          description: One case-insensitive keyword per line; matches article titles only.
         created_at:
           type: integer
           format: int64

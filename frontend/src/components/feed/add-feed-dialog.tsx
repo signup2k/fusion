@@ -319,7 +319,7 @@ export function AddFeedDialog() {
 											rows={4}
 										/>
 										<p className="text-xs text-muted-foreground">
-											匹配标题和正文，不区分大小写；任一关键词命中即生效。
+							只匹配文章标题，不区分大小写；任一关键词命中即生效。
 										</p>
 									</div>
 								)}

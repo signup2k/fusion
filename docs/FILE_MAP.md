@@ -121,7 +121,7 @@ Purpose: Adds per-feed blocklist/allowlist mode and newline-delimited content-fi
 
 ### backend/internal/pull/filter.go (~25 lines, Go, map-updated 2026-09-15)
 
-Purpose: Applies per-feed case-insensitive keyword filtering to parsed article titles and content before persistence.
+Purpose: Applies per-feed case-insensitive keyword filtering to parsed article titles before persistence.
 
 ### backend/internal/pull/parser.go (~244 lines, Go, map-updated 2026-07-16)
 
