@@ -837,6 +837,8 @@ components:
         - name
         - link
         - suspended
+        - filter_mode
+        - filter_keywords
         - created_at
         - updated_at
         - fetch_state
@@ -859,6 +861,12 @@ components:
           type: boolean
         proxy:
           type: string
+        filter_mode:
+          type: string
+          enum: [none, blocklist, allowlist]
+        filter_keywords:
+          type: string
+          description: One case-insensitive keyword per line; matches article title and content.
         created_at:
           type: integer
           format: int64
@@ -951,6 +959,11 @@ components:
           type: string
         proxy:
           type: string
+        filter_mode:
+          type: string
+          enum: [none, blocklist, allowlist]
+        filter_keywords:
+          type: string
 
     UpdateFeedRequest:
       type: object
@@ -967,6 +980,11 @@ components:
         suspended:
           type: boolean
         proxy:
+          type: string
+        filter_mode:
+          type: string
+          enum: [none, blocklist, allowlist]
+        filter_keywords:
           type: string
 
     BatchCreateFeedItem:

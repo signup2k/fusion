@@ -17,20 +17,24 @@ import (
 )
 
 type createFeedRequest struct {
-	GroupID int64  `json:"group_id" binding:"required"`
-	Name    string `json:"name" binding:"required"`
-	Link    string `json:"link" binding:"required"`
-	SiteURL string `json:"site_url"`
-	Proxy   string `json:"proxy"`
+	GroupID        int64  `json:"group_id" binding:"required"`
+	Name           string `json:"name" binding:"required"`
+	Link           string `json:"link" binding:"required"`
+	SiteURL        string `json:"site_url"`
+	Proxy          string `json:"proxy"`
+	FilterMode     string `json:"filter_mode"`
+	FilterKeywords string `json:"filter_keywords"`
 }
 
 type updateFeedRequest struct {
-	GroupID   *int64  `json:"group_id"`
-	Name      *string `json:"name"`
-	Link      *string `json:"link"`
-	SiteURL   *string `json:"site_url"`
-	Suspended *bool   `json:"suspended"`
-	Proxy     *string `json:"proxy"` // Empty string clears proxy
+	GroupID        *int64  `json:"group_id"`
+	Name           *string `json:"name"`
+	Link           *string `json:"link"`
+	SiteURL        *string `json:"site_url"`
+	Suspended      *bool   `json:"suspended"`
+	Proxy          *string `json:"proxy"` // Empty string clears proxy
+	FilterMode     *string `json:"filter_mode"`
+	FilterKeywords *string `json:"filter_keywords"`
 }
 
 type validateFeedRequest struct {
@@ -108,11 +112,32 @@ func (h *Handler) createFeed(c *gin.Context) {
 		badRequestError(c, "invalid link")
 		return
 	}
+	if !validFeedFilterMode(req.FilterMode) {
+		badRequestError(c, "invalid filter_mode")
+		return
+	}
 
 	feed, err := h.store.CreateFeed(req.GroupID, req.Name, req.Link, req.SiteURL, req.Proxy)
 	if err != nil {
 		internalError(c, err, "create feed")
 		return
+	}
+	if req.FilterMode != "" || req.FilterKeywords != "" {
+		mode := req.FilterMode
+		if mode == "" {
+			mode = "none"
+		}
+		if err := h.store.UpdateFeed(feed.ID, store.UpdateFeedParams{
+			FilterMode: &mode, FilterKeywords: &req.FilterKeywords,
+		}); err != nil {
+			internalError(c, err, "set feed filter")
+			return
+		}
+		feed, err = h.store.GetFeed(feed.ID)
+		if err != nil {
+			internalError(c, err, "get created feed")
+			return
+		}
 	}
 
 	// Trigger initial pull in background.
@@ -164,6 +189,16 @@ func (h *Handler) updateFeed(c *gin.Context) {
 	if req.Proxy != nil {
 		params.Proxy = req.Proxy
 	}
+	if req.FilterMode != nil {
+		if !validFeedFilterMode(*req.FilterMode) {
+			badRequestError(c, "invalid filter_mode")
+			return
+		}
+		params.FilterMode = req.FilterMode
+	}
+	if req.FilterKeywords != nil {
+		params.FilterKeywords = req.FilterKeywords
+	}
 
 	if err := h.store.UpdateFeed(id, params); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -185,6 +220,10 @@ func (h *Handler) updateFeed(c *gin.Context) {
 	}
 
 	dataResponse(c, feed)
+}
+
+func validFeedFilterMode(mode string) bool {
+	return mode == "" || mode == "none" || mode == "blocklist" || mode == "allowlist"
 }
 
 func (h *Handler) deleteFeed(c *gin.Context) {

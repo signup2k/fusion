@@ -113,7 +113,15 @@ Structure:
 - `SearchItems` (L411): searches the FTS index with a LIKE fallback.
 Gotchas: Item column changes require coordinated SELECT/Scan updates in several methods.
 
+### backend/internal/store/migrations/005_feed_content_filter.sql (~5 lines, SQL, map-updated 2026-09-15)
+
+Purpose: Adds per-feed blocklist/allowlist mode and newline-delimited content-filter keywords.
+
 ## Feed ingestion
+
+### backend/internal/pull/filter.go (~25 lines, Go, map-updated 2026-09-15)
+
+Purpose: Applies per-feed case-insensitive keyword filtering to parsed article titles and content before persistence.
 
 ### backend/internal/pull/parser.go (~244 lines, Go, map-updated 2026-07-16)
 

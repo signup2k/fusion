@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	Select,
 	SelectContent,
@@ -31,7 +32,7 @@ import {
 import { useUIStore } from "@/store";
 import { useGroups } from "@/queries/groups";
 import { useUpdateFeed, useDeleteFeed } from "@/queries/feeds";
-import type { Feed, UpdateFeedRequest } from "@/lib/api";
+import type { Feed, FeedFilterMode, UpdateFeedRequest } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,8 +55,14 @@ function EditFeedForm({ editingFeed }: { editingFeed: Feed }) {
 	const [groupId, setGroupId] = useState(String(editingFeed.group_id));
 	const [proxy, setProxy] = useState(editingFeed.proxy ?? "");
 	const [suspended, setSuspended] = useState(editingFeed.suspended);
+	const [filterMode, setFilterMode] = useState<FeedFilterMode>(
+		editingFeed.filter_mode ?? "none",
+	);
+	const [filterKeywords, setFilterKeywords] = useState(
+		editingFeed.filter_keywords ?? "",
+	);
 	const [isAdvancedOpen, setIsAdvancedOpen] = useState(
-		Boolean(editingFeed.proxy),
+		Boolean(editingFeed.proxy) || editingFeed.filter_mode !== "none",
 	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -71,6 +78,8 @@ function EditFeedForm({ editingFeed }: { editingFeed: Feed }) {
 		setGroupId("");
 		setProxy("");
 		setSuspended(false);
+		setFilterMode("none");
+		setFilterKeywords("");
 		setIsAdvancedOpen(false);
 		setIsDeleteOpen(false);
 	};
@@ -118,6 +127,12 @@ function EditFeedForm({ editingFeed }: { editingFeed: Feed }) {
 			const newProxy = proxy.trim() || undefined;
 			if (newProxy !== editingFeed.proxy) {
 				request.proxy = newProxy;
+			}
+			if (filterMode !== editingFeed.filter_mode) {
+				request.filter_mode = filterMode;
+			}
+			if (filterKeywords.trim() !== editingFeed.filter_keywords) {
+				request.filter_keywords = filterKeywords.trim();
 			}
 
 			if (Object.keys(request).length === 0) {
@@ -330,6 +345,49 @@ function EditFeedForm({ editingFeed }: { editingFeed: Feed }) {
 								<p className="text-xs text-muted-foreground">
 									留空则使用系统代理设置
 								</p>
+								<div className="space-y-1.5 pt-2">
+									<label
+										id="edit-feed-filter-mode-label"
+										className="text-[13px] font-medium"
+									>
+										文章过滤
+									</label>
+									<Select
+										value={filterMode}
+										onValueChange={(value) =>
+											value && setFilterMode(value as FeedFilterMode)
+										}
+									>
+										<SelectTrigger
+											className="h-10"
+											aria-labelledby="edit-feed-filter-mode-label"
+										>
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="none">不过滤</SelectItem>
+											<SelectItem value="blocklist">黑名单</SelectItem>
+											<SelectItem value="allowlist">白名单</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								{filterMode !== "none" && (
+									<div className="space-y-1.5">
+										<label htmlFor="edit-feed-filter-keywords" className="text-[13px] font-medium">
+											关键词
+										</label>
+										<Textarea
+											id="edit-feed-filter-keywords"
+											value={filterKeywords}
+											onChange={(event) => setFilterKeywords(event.target.value)}
+											placeholder={"每行一个关键词\n例如：广告"}
+											rows={4}
+										/>
+										<p className="text-xs text-muted-foreground">
+											匹配标题和正文，不区分大小写；任一关键词命中即生效。
+										</p>
+									</div>
+								)}
 							</CollapsibleContent>
 						</Collapsible>
 					</div>

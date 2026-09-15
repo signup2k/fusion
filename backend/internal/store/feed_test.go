@@ -91,6 +91,9 @@ func TestCreateFeed(t *testing.T) {
 	if feed.Suspended != false {
 		t.Error("expected suspended to default to false")
 	}
+	if feed.FilterMode != "none" || feed.FilterKeywords != "" {
+		t.Fatalf("unexpected default filter: mode=%q keywords=%q", feed.FilterMode, feed.FilterKeywords)
+	}
 
 	if feed.FetchState.ConsecutiveFailures != 0 {
 		t.Error("expected consecutive_failures to default to 0")
@@ -119,12 +122,16 @@ func TestUpdateFeed(t *testing.T) {
 	newName := "Updated Feed"
 	newSiteURL := "https://updated.example.com"
 	suspended := true
+	filterMode := "blocklist"
+	filterKeywords := "广告\n推广"
 
 	params := UpdateFeedParams{
-		Name:      &newName,
-		SiteURL:   &newSiteURL,
-		Suspended: &suspended,
-		GroupID:   &group2.ID,
+		Name:           &newName,
+		SiteURL:        &newSiteURL,
+		Suspended:      &suspended,
+		GroupID:        &group2.ID,
+		FilterMode:     &filterMode,
+		FilterKeywords: &filterKeywords,
 	}
 
 	if err := store.UpdateFeed(feed.ID, params); err != nil {
@@ -150,6 +157,9 @@ func TestUpdateFeed(t *testing.T) {
 
 	if updated.GroupID != group2.ID {
 		t.Errorf("expected group_id %d, got %d", group2.ID, updated.GroupID)
+	}
+	if updated.FilterMode != filterMode || updated.FilterKeywords != filterKeywords {
+		t.Fatalf("filter = (%q, %q), want (%q, %q)", updated.FilterMode, updated.FilterKeywords, filterMode, filterKeywords)
 	}
 
 	// Test updating only one field (others should remain unchanged)

@@ -14,12 +14,16 @@ export interface Feed {
   site_url?: string;
   suspended: boolean;
   proxy?: string;
+  filter_mode: FeedFilterMode;
+  filter_keywords: string;
   created_at: number;
   updated_at: number;
   fetch_state: FeedFetchState;
   unread_count: number;
   item_count: number;
 }
+
+export type FeedFilterMode = "none" | "blocklist" | "allowlist";
 
 export interface FeedFetchState {
   etag?: string;
@@ -93,6 +97,8 @@ export interface CreateFeedRequest {
   link: string;
   site_url?: string;
   proxy?: string;
+  filter_mode?: FeedFilterMode;
+  filter_keywords?: string;
 }
 
 export interface UpdateFeedRequest {
@@ -102,6 +108,8 @@ export interface UpdateFeedRequest {
   site_url?: string;
   suspended?: boolean;
   proxy?: string;
+  filter_mode?: FeedFilterMode;
+  filter_keywords?: string;
 }
 
 export interface ValidateFeedRequest {

@@ -188,6 +188,9 @@ func (p *Puller) pullFeed(ctx context.Context, feed *model.Feed) {
 
 	inputs := make([]store.BatchCreateItemInput, 0, len(result.Items))
 	for _, item := range result.Items {
+		if !itemPassesFilter(feed.FilterMode, feed.FilterKeywords, item.Title, item.Content) {
+			continue
+		}
 		inputs = append(inputs, store.BatchCreateItemInput{
 			GUID:    item.GUID,
 			Title:   item.Title,

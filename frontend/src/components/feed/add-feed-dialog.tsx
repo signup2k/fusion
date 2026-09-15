@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	Select,
 	SelectContent,
@@ -28,6 +29,7 @@ import {
 	feedAPI,
 	type CreateFeedRequest,
 	type DiscoveredFeed,
+	type FeedFilterMode,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -41,6 +43,8 @@ export function AddFeedDialog() {
 	const [name, setName] = useState("");
 	const [groupId, setGroupId] = useState<string>("");
 	const [proxy, setProxy] = useState("");
+	const [filterMode, setFilterMode] = useState<FeedFilterMode>("none");
+	const [filterKeywords, setFilterKeywords] = useState("");
 	const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isValidating, setIsValidating] = useState(false);
@@ -52,6 +56,8 @@ export function AddFeedDialog() {
 		setName("");
 		setGroupId("");
 		setProxy("");
+		setFilterMode("none");
+		setFilterKeywords("");
 		setIsAdvancedOpen(false);
 		setDetectedFeeds([]);
 		setIsFeedSelectOpen(false);
@@ -122,6 +128,10 @@ export function AddFeedDialog() {
 
 			if (proxy.trim()) {
 				request.proxy = proxy.trim();
+			}
+			if (filterMode !== "none") {
+				request.filter_mode = filterMode;
+				request.filter_keywords = filterKeywords.trim();
 			}
 
 			await createFeed.mutateAsync(request);
@@ -276,6 +286,43 @@ export function AddFeedDialog() {
 								<p className="text-xs text-muted-foreground">
 									留空则使用系统代理设置
 								</p>
+								<div className="space-y-1.5 pt-2">
+									<label id="add-feed-filter-mode-label" className="text-[13px] font-medium">
+										文章过滤
+									</label>
+									<Select
+										value={filterMode}
+										onValueChange={(value) =>
+											value && setFilterMode(value as FeedFilterMode)
+										}
+									>
+										<SelectTrigger className="h-10" aria-labelledby="add-feed-filter-mode-label">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="none">不过滤</SelectItem>
+											<SelectItem value="blocklist">黑名单</SelectItem>
+											<SelectItem value="allowlist">白名单</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								{filterMode !== "none" && (
+									<div className="space-y-1.5">
+										<label htmlFor="add-feed-filter-keywords" className="text-[13px] font-medium">
+											关键词
+										</label>
+										<Textarea
+											id="add-feed-filter-keywords"
+											value={filterKeywords}
+											onChange={(event) => setFilterKeywords(event.target.value)}
+											placeholder={"每行一个关键词\n例如：广告"}
+											rows={4}
+										/>
+										<p className="text-xs text-muted-foreground">
+											匹配标题和正文，不区分大小写；任一关键词命中即生效。
+										</p>
+									</div>
+								)}
 							</CollapsibleContent>
 						</Collapsible>
 					</div>
