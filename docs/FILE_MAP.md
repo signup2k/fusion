@@ -3,7 +3,7 @@
 > Per-file index for AI agents. Read the relevant entry BEFORE opening a file;
 > read only the line ranges the entry points to. Update entries after structural
 > changes (see the repo-map skill).
-> Last partial audit: 2026-08-03 | Files mapped: 45
+> Last partial audit: 2026-10-04 | Files mapped: 55
 
 ## Project documentation
 
@@ -481,3 +481,64 @@ Update: Pin TypeScript to 6.0.3, whose JavaScript compiler API works with the in
 ### docs/reader-ux-verification.md
 
 Purpose: Records reading-flow changes, verification scope, and remaining visual QA limitations.
+
+## Public reader (2026-10-04)
+
+### docs/public-reader.md
+
+Purpose: Defines the optional public hostname, read-only API, rolling 168-hour window, deployment settings, and verification scope.
+
+### backend/internal/model/public.go
+
+Purpose: Defines public feed metadata and article DTOs with no personal state or internal source configuration.
+
+### backend/internal/store/public.go
+
+Purpose: Reads current public source metadata and bounded article previews/details without querying read state.
+Structure: `PublicItemsParams` at L12; `ListPublicFeeds` at L21; `ListPublicItems` at L39; `GetPublicItem` at L73.
+
+### backend/internal/handler/public.go
+
+Purpose: Recognizes the configured public hostname, denies writes and private routes there, and serves public feed/article endpoints.
+Structure: `isPublicRequest` at L19; hostname gate at L28; API gate at L53; feed list at L66; item list at L75; detail at L122.
+
+### backend/internal/handler/public_test.go
+
+Purpose: Covers publication windows, stable pagination, source changes/filtering, state and metadata isolation, private route/write denial, CORS boundaries, and opt-in configuration.
+
+### backend/internal/handler/handler.go
+
+Update: Registers public routes only when `FUSION_PUBLIC_HOST` is set and keeps public-origin CORS permissions scoped to requests on that host.
+
+### backend/internal/handler/frontend.go
+
+Update: Serves the separate `public.html` entry for the configured public hostname.
+
+### backend/internal/config/config.go and config_test.go
+
+Update: Loads, normalizes, and validates the optional hostname-only `FUSION_PUBLIC_HOST` setting.
+
+### frontend/public.html and frontend/src/public-main.tsx
+
+Purpose: Mount the standalone public reader without private routing, PWA registration, sessions, or management/state logic.
+
+### frontend/src/lib/public-api.ts
+
+Purpose: Defines public API types and GET-only requests that omit credentials and bypass HTTP caches.
+
+### frontend/src/components/public/public-reader.tsx
+
+Purpose: Renders a responsive chronological reader with source filtering, article expansion, pagination, theme selection, recovery actions, and minute-by-minute updates.
+Structure: `PublicReader` at L22; `PublicArticle` at L156. Expired cached rows are also removed on a 15-second client clock.
+
+### frontend/vite.config.ts
+
+Update: Builds separate private and public HTML entries while sharing common assets.
+
+### deploy.sh
+
+Update: Persists `PUBLIC_HOST` in Compose, validates public API/frontend on the candidate, and includes the setting in deployment no-op checks and rollback scope.
+
+### .env.example, README.md, and docs/openapi.yaml
+
+Update: Document public-host opt-in, anonymous read-only API endpoints, publication limits, and deployment configuration.

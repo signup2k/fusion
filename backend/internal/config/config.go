@@ -13,6 +13,7 @@ type Config struct {
 	Password      string // Plaintext password from env
 	Port          int
 	FeverUsername string // Username used to derive Fever API key.
+	PublicHost    string // Optional hostname for anonymous, read-only access to recent content.
 
 	CORSAllowedOrigins []string // Allowed Origins for CORS. Empty means allow all.
 	TrustedProxies     []string // Trusted reverse proxies for client IP resolution. Empty disables proxy trust.
@@ -112,6 +113,13 @@ func Load() (*Config, error) {
 
 	corsAllowedOrigins := parseCSVEnv(os.Getenv("FUSION_CORS_ALLOWED_ORIGINS"))
 	trustedProxies := parseCSVEnv(os.Getenv("FUSION_TRUSTED_PROXIES"))
+	publicHost := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(os.Getenv("FUSION_PUBLIC_HOST"))), ".")
+	if publicHost != "" {
+		parsed, err := url.Parse("https://" + publicHost)
+		if err != nil || parsed.Host != publicHost || parsed.Hostname() != publicHost || parsed.User != nil || strings.ContainsAny(publicHost, "*?#\\") {
+			return nil, fmt.Errorf("invalid FUSION_PUBLIC_HOST: use a hostname without a scheme, port, or path")
+		}
+	}
 
 	allowPrivateFeeds, err := getEnvBool("FUSION_ALLOW_PRIVATE_FEEDS", false)
 	if err != nil {
@@ -133,6 +141,7 @@ func Load() (*Config, error) {
 		Password:           password,
 		Port:               parsedPort,
 		FeverUsername:      getEnvString("FUSION_FEVER_USERNAME", "fusion"),
+		PublicHost:         publicHost,
 		CORSAllowedOrigins: corsAllowedOrigins,
 		TrustedProxies:     trustedProxies,
 		AllowPrivateFeeds:  allowPrivateFeeds,

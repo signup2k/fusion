@@ -20,6 +20,14 @@ func (h *Handler) setupFrontendRoutes(r *gin.Engine) error {
 
 	fileServer := http.FileServer(http.FS(frontendFS))
 	r.NoRoute(func(c *gin.Context) {
+		if h.isPublicRequest(c) {
+			setFrontendSecurityHeaders(c)
+			cleanPath := path.Clean(c.Request.URL.Path)
+			if cleanPath == "/" || cleanPath == "/index.html" || cleanPath == "/public.html" {
+				serveFrontendRequestPath(c, fileServer, "/public.html")
+				return
+			}
+		}
 		serveFrontendRoute(c, frontendFS, fileServer)
 	})
 

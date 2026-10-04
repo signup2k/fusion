@@ -12,6 +12,7 @@
 - Feed management: RSS/Atom parsing, feed auto-discovery, and group organization
 - Fever API compatibility for third-party clients (Reeder, Unread, FeedMe, etc.)
 - Responsive web UI with PWA support
+- Optional public reader: anonymous, read-only access to the latest 7 days of articles
 - Self-hosting friendly: single binary or Docker deployment
 - Built-in i18n: English, Chinese, German, French, Spanish, Russian, Portuguese, Swedish
 - No AI features by design: focused, distraction-free RSS reading
@@ -97,6 +98,9 @@ Then configure based on your goal:
   - Optional: `FUSION_PORT`, `FUSION_DB_PATH`
 - Expose Fusion behind a reverse proxy
   - Configure: `FUSION_CORS_ALLOWED_ORIGINS`, `FUSION_TRUSTED_PROXIES`
+- Share current subscriptions through a separate read-only hostname
+  - Configure: `FUSION_PUBLIC_HOST`
+  - Guide: [`docs/public-reader.md`](./docs/public-reader.md)
 - Use mobile/desktop Fever clients (Reeder, Unread, FeedMe)
   - Configure: `FUSION_FEVER_USERNAME` (default: `fusion`)
   - Guide: [`docs/fever-api.md`](./docs/fever-api.md)

@@ -5,6 +5,8 @@ info:
   description: >-
     OpenAPI contract for Fusion backend. All endpoints are under /api.
     Authentication uses a session cookie named `session`.
+    Optional /public endpoints allow anonymous reads only on FUSION_PUBLIC_HOST,
+    with a server-enforced rolling 168-hour publication window.
     Fever compatibility endpoints (/fever, /fever/, /fever.php) are documented
     separately in docs/fever-api.md.
 servers:
@@ -17,9 +19,113 @@ tags:
   - name: Items
   - name: Search
   - name: Bookmarks
+  - name: Public
 security:
   - sessionCookie: []
 paths:
+  /public/feeds:
+    get:
+      tags: [Public]
+      summary: List public source metadata
+      description: Available only on the configured public hostname. Contains no private feed settings or unread counts.
+      security: []
+      responses:
+        "200":
+          description: Current subscription sources
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicFeed"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /public/items:
+    get:
+      tags: [Public]
+      summary: List public articles from the rolling last 168 hours
+      description: Publication time descending, then ID descending. Returns previews without personal state. Future-dated articles are excluded.
+      security: []
+      parameters:
+        - name: feed_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 30
+        - name: before
+          in: query
+          description: Composite cursor in the format pub_date_id.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bounded article previews; Cache-Control is no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, next_cursor, window_start, window_end]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicItem"
+                  next_cursor:
+                    type: string
+                    nullable: true
+                  window_start:
+                    type: integer
+                    format: int64
+                  window_end:
+                    type: integer
+                    format: int64
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /public/items/{id}:
+    get:
+      tags: [Public]
+      summary: Read a complete public article
+      description: Available only on the public hostname. Deleted, expired, or future-dated articles return 404. Never changes private read state.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Full article without personal state; Cache-Control is no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PublicItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /sessions:
     post:
       tags: [Sessions]
@@ -760,6 +866,44 @@ components:
             error: internal server error
 
   schemas:
+    PublicFeed:
+      type: object
+      required: [id, name]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        site_url:
+          type: string
+
+    PublicItem:
+      type: object
+      required: [id, feed_id, title, link, pub_date]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+        feed_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        link:
+          type: string
+        content:
+          type: string
+          description: Full HTML content, included only in detail responses when nonempty.
+        content_preview:
+          type: string
+          description: At most 2048 characters of source HTML, included only in list responses when nonempty.
+        pub_date:
+          type: integer
+          format: int64
+
     ErrorResponse:
       type: object
       required: [error]

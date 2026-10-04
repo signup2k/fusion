@@ -8,6 +8,7 @@ DEPLOYMENT_DIR=${DEPLOYMENT_DIR:-"$(dirname -- "$SOURCE_DIR")"}
 SSH_HOST=${SSH_HOST:-bwgvps1}
 REMOTE_DIR=${REMOTE_DIR:-/root/rssreader-fusion}
 DOMAIN=${DOMAIN:-rss.iooi-forfun.cc}
+PUBLIC_HOST=${PUBLIC_HOST-rss2.iooi-forfun.cc}
 REPOSITORY=${REPOSITORY:-https://github.com/signup2k/fusion.git}
 IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-signup2k/fusion}
 
@@ -33,7 +34,7 @@ image="$IMAGE_REPOSITORY:$short_commit"
 printf 'Deploying %s as %s to %s...\n' "$commit" "$image" "$SSH_HOST"
 
 ssh "$SSH_HOST" bash -s -- \
-  "$commit" "$short_commit" "$image" "$REMOTE_DIR" "$DOMAIN" "$REPOSITORY" <<'REMOTE_SCRIPT'
+  "$commit" "$short_commit" "$image" "$REMOTE_DIR" "$DOMAIN" "$REPOSITORY" "$PUBLIC_HOST" <<'REMOTE_SCRIPT'
 set -Eeuo pipefail
 
 commit=$1
@@ -42,6 +43,7 @@ image=$3
 remote_dir=$4
 domain=$5
 repository=$6
+public_host=$7
 source_dir="$remote_dir/source"
 compose_file="$remote_dir/compose.yaml"
 container_name="rssreader-fusion"
@@ -183,6 +185,7 @@ docker run -d \
   --env-file "$remote_dir/.env" \
   -e FUSION_DB_PATH=/data/fusion.db \
   -e FUSION_CORS_ALLOWED_ORIGINS="https://$domain" \
+  -e FUSION_PUBLIC_HOST="$public_host" \
   -v "$candidate_dir:/data" \
   "$image" >/dev/null
 
@@ -191,6 +194,10 @@ if ! wait_for_health "$candidate_name" 30; then
   exit 1
 fi
 docker exec "$candidate_name" wget -q -O /dev/null http://127.0.0.1:8080/api/oidc/enabled
+if [ -n "$public_host" ]; then
+  docker exec "$candidate_name" wget -q -O /dev/null --header="Host: $public_host" http://127.0.0.1:8080/api/public/feeds
+  docker exec "$candidate_name" wget -q -O /dev/null --header="Host: $public_host" http://127.0.0.1:8080/
+fi
 candidate_database_errors=$(docker logs "$candidate_name" 2>&1 |
   grep -Ec 'disk I/O error|database is locked|SQLITE_BUSY' || true)
 [ "$candidate_database_errors" -eq 0 ] || {
@@ -212,7 +219,8 @@ previous_image=$(docker inspect "$container_name" --format '{{.Config.Image}}')
 current_tmpfs=$(docker inspect "$container_name" --format '{{index .HostConfig.Tmpfs "/tmp"}}')
 
 current_health=$(docker inspect "$container_name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}')
-if [ "$previous_image" = "$image" ] && [ "$current_health" = "healthy" ] && [ -n "$current_tmpfs" ]; then
+current_public_host=$(docker inspect "$container_name" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^FUSION_PUBLIC_HOST=//p')
+if [ "$previous_image" = "$image" ] && [ "$current_health" = "healthy" ] && [ -n "$current_tmpfs" ] && [ "$current_public_host" = "$public_host" ]; then
   [ "$(sqlite3 "$remote_dir/data/fusion.db" 'PRAGMA quick_check;')" = "ok" ]
   curl -fsS "http://127.0.0.1:8010/api/oidc/enabled" >/dev/null
   curl -fsS "https://$domain/" >/dev/null
@@ -232,10 +240,25 @@ echo "Backing up production database to $backup_path..."
 sqlite3 "$remote_dir/data/fusion.db" ".backup '$backup_path'"
 [ "$(sqlite3 "$backup_path" 'PRAGMA quick_check;')" = "ok" ]
 
+production_switch_started=1
+python3 - "$compose_file" "$public_host" <<'COMPOSE_SCRIPT'
+import json
+import pathlib
+import re
+import sys
+
+file = pathlib.Path(sys.argv[1])
+content = file.read_text()
+public_line = '      FUSION_PUBLIC_HOST: ' + json.dumps(sys.argv[2]) + '\n'
+if re.search(r'^\s*FUSION_PUBLIC_HOST:.*$', content, re.M):
+    content = re.sub(r'^\s*FUSION_PUBLIC_HOST:.*\n', lambda _: public_line, content, flags=re.M)
+else:
+    content = content.replace('    environment:\n', '    environment:\n' + public_line, 1)
+file.write_text(content)
+COMPOSE_SCRIPT
 sed -i -E "s|^([[:space:]]*image:).*|\1 $image|" "$compose_file"
 docker compose config --quiet
 
-production_switch_started=1
 echo "Switching production from $previous_image to $image..."
 docker compose stop fusion
 sqlite3 "$remote_dir/data/fusion.db" 'PRAGMA wal_checkpoint(TRUNCATE);' >/dev/null
@@ -250,6 +273,10 @@ sleep 5
 [ "$(sqlite3 "$remote_dir/data/fusion.db" 'PRAGMA quick_check;')" = "ok" ]
 curl -fsS "http://127.0.0.1:8010/api/oidc/enabled" >/dev/null
 curl -fsS "https://$domain/" >/dev/null
+if [ -n "$public_host" ]; then
+  curl -fsS -H "Host: $public_host" http://127.0.0.1:8010/api/public/feeds >/dev/null
+  curl -fsS -H "Host: $public_host" http://127.0.0.1:8010/ >/dev/null
+fi
 
 startup_database_errors=$(docker logs "$container_name" 2>&1 |
   grep -Ec 'disk I/O error|database is locked|SQLITE_BUSY' || true)
@@ -286,6 +313,7 @@ cat >>"$log_file" <<EOF
 - Image: \`$image\`
 - Image ID: \`$image_id\`
 - Previous image: \`$previous_image\`
+- Public reader host: \`$public_host\`
 - Database backup: \`$backup_path\`
 - Container started: \`$started_at\`
 - Validation: backend tests, production build, candidate health, production health, HTTPS, and SQLite checks passed.

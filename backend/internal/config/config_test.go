@@ -107,3 +107,27 @@ func TestLoadRejectsInvalidFusionPort(t *testing.T) {
 		t.Fatalf("expected error to mention invalid FUSION_PORT, got %v", err)
 	}
 }
+
+func TestLoadPublicHost(t *testing.T) {
+	t.Setenv("FUSION_PASSWORD", "secret")
+	for _, input := range []string{"", " RSS2.Example.COM. ", "https://example.com", "example.com:8080", "example.com/path", "user@example.com", "*.example.com", "example.com?query=1"} {
+		t.Run(input, func(t *testing.T) {
+			t.Setenv("FUSION_PUBLIC_HOST", input)
+			cfg, err := Load()
+			if input == "" || input == " RSS2.Example.COM. " {
+				if err != nil {
+					t.Fatalf("Load: %v", err)
+				}
+				want := ""
+				if input != "" {
+					want = "rss2.example.com"
+				}
+				if cfg.PublicHost != want {
+					t.Fatalf("PublicHost = %q, want %q", cfg.PublicHost, want)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), "FUSION_PUBLIC_HOST") {
+				t.Fatalf("expected invalid public hostname, got %v", err)
+			}
+		})
+	}
+}

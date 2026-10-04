@@ -96,13 +96,19 @@ func (h *Handler) SetupRouter() *gin.Engine {
 		slog.Warn("failed to configure trusted proxies", "error", err)
 	}
 
-	r.Use(h.corsMiddleware())
+	r.Use(h.publicHostMiddleware(), h.corsMiddleware())
 	r.POST("/fever", h.fever)
 	r.POST("/fever/", h.fever)
 	r.POST("/fever.php", h.fever)
 
 	api := r.Group("/api")
 	{
+		if h.config != nil && h.config.PublicHost != "" {
+			public := api.Group("/public", h.publicAPIMiddleware())
+			public.GET("/feeds", h.listPublicFeeds)
+			public.GET("/items", h.listPublicItems)
+			public.GET("/items/:id", h.getPublicItem)
+		}
 		api.POST("/sessions", h.login)
 		api.DELETE("/sessions", h.logout)
 
@@ -168,19 +174,30 @@ func (h *Handler) configureTrustedProxies(r *gin.Engine) error {
 func (h *Handler) corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := strings.TrimSpace(c.Request.Header.Get("Origin"))
+		public := h.isPublicRequest(c)
 		if origin != "" {
-			if !h.isOriginAllowed(origin) {
+			allowed := h.isOriginAllowed(origin)
+			if public {
+				host := strings.ToLower(c.Request.Host)
+				allowed = normalizeOrigin(origin) == "https://"+host || normalizeOrigin(origin) == "http://"+host
+			}
+			if !allowed {
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Vary", "Origin")
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			if !public {
+				c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
 		} else {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
+		if public {
+			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, HEAD")
+		}
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)

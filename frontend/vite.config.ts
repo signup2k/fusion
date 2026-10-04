@@ -19,6 +19,14 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(getGitVersion()),
   },
   plugins: [react(), tanstackRouter(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      input: {
+        index: path.resolve(__dirname, "index.html"),
+        public: path.resolve(__dirname, "public.html"),
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
