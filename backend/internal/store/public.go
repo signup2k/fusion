@@ -13,13 +13,32 @@ type PublicItemsParams struct {
 	Since         int64
 	Until         int64
 	FeedID        int64
+	GroupID       int64
 	Limit         int
 	BeforePubDate *int64
 	BeforeID      *int64
 }
 
+func (s *Store) ListPublicGroups() ([]*model.PublicGroup, error) {
+	rows, err := s.db.Query(`SELECT id, name FROM groups ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	groups := []*model.PublicGroup{}
+	for rows.Next() {
+		group := &model.PublicGroup{}
+		if err := rows.Scan(&group.ID, &group.Name); err != nil {
+			return nil, err
+		}
+		groups = append(groups, group)
+	}
+	return groups, rows.Err()
+}
+
 func (s *Store) ListPublicFeeds() ([]*model.PublicFeed, error) {
-	rows, err := s.db.Query(`SELECT id, name, site_url FROM feeds ORDER BY name COLLATE NOCASE, id`)
+	rows, err := s.db.Query(`SELECT id, group_id, name, site_url FROM feeds ORDER BY name COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +47,7 @@ func (s *Store) ListPublicFeeds() ([]*model.PublicFeed, error) {
 	feeds := []*model.PublicFeed{}
 	for rows.Next() {
 		feed := &model.PublicFeed{}
-		if err := rows.Scan(&feed.ID, &feed.Name, &feed.SiteURL); err != nil {
+		if err := rows.Scan(&feed.ID, &feed.GroupID, &feed.Name, &feed.SiteURL); err != nil {
 			return nil, err
 		}
 		feeds = append(feeds, feed)
@@ -46,6 +65,10 @@ func (s *Store) ListPublicItems(params PublicItemsParams) ([]*model.PublicItem, 
 	if params.FeedID > 0 {
 		query += ` AND feed_id = :feed_id`
 		args = append(args, sql.Named("feed_id", params.FeedID))
+	}
+	if params.GroupID > 0 {
+		query += ` AND feed_id IN (SELECT id FROM feeds WHERE group_id = :group_id)`
+		args = append(args, sql.Named("group_id", params.GroupID))
 	}
 	if params.BeforePubDate != nil && params.BeforeID != nil {
 		query += ` AND (pub_date < :before_pub_date OR (pub_date = :before_pub_date AND id < :before_id))`

@@ -27,7 +27,7 @@ paths:
     get:
       tags: [Public]
       summary: List public source metadata
-      description: Available only on the configured public hostname. Contains no private feed settings or unread counts.
+      description: Available only on the configured public hostname. Includes current group names and source memberships without private feed settings or unread counts.
       security: []
       responses:
         "200":
@@ -36,12 +36,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required: [data, groups]
                 properties:
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/PublicFeed"
+                  groups:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicGroup"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -56,6 +60,13 @@ paths:
       parameters:
         - name: feed_id
           in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: group_id
+          in: query
+          description: Filter by current group membership. When feed_id is also supplied, both filters apply.
           schema:
             type: integer
             format: int64
@@ -866,12 +877,26 @@ components:
             error: internal server error
 
   schemas:
-    PublicFeed:
+    PublicGroup:
       type: object
       required: [id, name]
       additionalProperties: false
       properties:
         id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    PublicFeed:
+      type: object
+      required: [id, group_id, name]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+        group_id:
           type: integer
           format: int64
         name:

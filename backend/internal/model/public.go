@@ -1,8 +1,15 @@
 package model
 
+// PublicGroup contains the shared name of a subscription group.
+type PublicGroup struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
 // PublicFeed contains only the source metadata needed by the public reader.
 type PublicFeed struct {
 	ID      int64  `json:"id"`
+	GroupID int64  `json:"group_id"`
 	Name    string `json:"name"`
 	SiteURL string `json:"site_url,omitempty"`
 }

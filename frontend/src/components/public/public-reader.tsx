@@ -5,22 +5,27 @@ import {
   ChevronDown,
   ExternalLink,
   LoaderCircle,
+  Menu,
   Moon,
   RefreshCw,
   Rss,
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { PublicSourceNav } from "./public-source-nav";
 import { processArticleContent } from "@/lib/content";
-import { publicAPI, PublicAPIError, type PublicFeed, type PublicItem } from "@/lib/public-api";
+import { publicAPI, PublicAPIError, type PublicFeed, type PublicItem, type PublicScope } from "@/lib/public-api";
 import { toSafeExternalUrl } from "@/lib/safe-url";
 import { cn, extractSummary, formatDate } from "@/lib/utils";
 
 const REFRESH_INTERVAL = 60_000;
 const WINDOW_SECONDS = 7 * 24 * 60 * 60;
+const ALL_SOURCES: PublicScope = { kind: "all" };
 
 export function PublicReader() {
-  const [selectedFeedId, setSelectedFeedId] = useState(0);
+  const [selectedScope, setSelectedScope] = useState<PublicScope>(ALL_SOURCES);
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const queryClient = useQueryClient();
@@ -31,11 +36,17 @@ export function PublicReader() {
     refetchInterval: REFRESH_INTERVAL,
   });
   const sources = useMemo(() => feeds.data?.data ?? [], [feeds.data]);
+  const groups = useMemo(() => feeds.data?.groups ?? [], [feeds.data]);
   const sourcesById = useMemo(() => new Map(sources.map((feed) => [feed.id, feed])), [sources]);
-  const feedId = sourcesById.has(selectedFeedId) ? selectedFeedId : 0;
+  const groupsById = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups]);
+  const scope = selectedScope.kind === "feed" && !sourcesById.has(selectedScope.id)
+    || selectedScope.kind === "group" && !groupsById.has(selectedScope.id)
+    ? ALL_SOURCES : selectedScope;
+  const scopeName = scope.kind === "feed" ? sourcesById.get(scope.id)?.name
+    : scope.kind === "group" ? groupsById.get(scope.id)?.name : "全部订阅源";
   const items = useInfiniteQuery({
-    queryKey: ["public", "items", feedId],
-    queryFn: ({ pageParam, signal }) => publicAPI.items(feedId, pageParam, signal),
+    queryKey: ["public", "items", scope.kind, scope.kind === "all" ? 0 : scope.id],
+    queryFn: ({ pageParam, signal }) => publicAPI.items(scope, pageParam, signal),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
     refetchInterval: REFRESH_INTERVAL,
@@ -54,16 +65,47 @@ export function PublicReader() {
   );
   const isRefreshing = feeds.isFetching || items.isFetching;
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["public"] });
+  const selectScope = (next: PublicScope) => {
+    setSelectedScope(next);
+    setExpandedId(null);
+    setSourceMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+  const sourceNavigation = (
+    <>
+      {feeds.isPending && <p role="status" className="p-4 text-sm text-muted-foreground">正在加载订阅源…</p>}
+      {feeds.isError && (
+        <div role="alert" className="m-3 rounded-lg bg-muted p-3 text-sm">
+          <p className="mb-3">订阅源加载失败，请重试。</p>
+          <Button variant="outline" size="sm" onClick={() => void feeds.refetch()}>重试</Button>
+        </div>
+      )}
+      <PublicSourceNav groups={groups} feeds={sources} scope={scope} onSelect={selectScope} />
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <img src="/icon-96.png" alt="" width={36} height={36} className="size-9 rounded-lg" />
+            <Sheet open={sourceMenuOpen} onOpenChange={setSourceMenuOpen}>
+              <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="打开订阅源分组" />}>
+                <Menu className="size-5" />
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[min(20rem,85vw)] gap-0" showCloseButton={false}>
+                <SheetHeader className="border-b">
+                  <SheetTitle>订阅源分组</SheetTitle>
+                  <SheetDescription>选择分组或订阅源查看最近 7 天的文章。</SheetDescription>
+                  <Button variant="ghost" size="sm" className="mt-2 self-start" onClick={() => setSourceMenuOpen(false)}>关闭分组列表</Button>
+                </SheetHeader>
+                <div className="min-h-0 flex-1 overflow-y-auto">{sourceNavigation}</div>
+              </SheetContent>
+            </Sheet>
+            <img src="/icon-96.png" alt="" width={36} height={36} className="hidden size-9 rounded-lg sm:block" />
             <div>
-              <h1 className="text-base font-semibold">Fusion <span className="font-normal text-muted-foreground">公开阅读</span></h1>
-              <p className="mt-0.5 text-xs text-muted-foreground">最近 7 天 · 最新文章在前</p>
+              <h1 className="text-base font-semibold"><span className="hidden sm:inline">Fusion </span><span className="font-normal text-muted-foreground">公开阅读</span></h1>
+              <p className="mt-0.5 text-xs text-muted-foreground">最近 7 天<span className="hidden sm:inline"> · 最新文章在前</span></p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -77,78 +119,64 @@ export function PublicReader() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 pb-12 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b py-5">
-          <label className="flex min-w-0 items-center gap-2 text-sm">
-            <Rss className="size-4 shrink-0 text-muted-foreground" />
-            <span className="sr-only">订阅源</span>
-            <select
-              className="max-w-[65vw] rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring sm:max-w-md"
-              aria-label="订阅源"
-              value={feedId}
-              onChange={(event) => {
-                setSelectedFeedId(Number(event.target.value));
-                setExpandedId(null);
-              }}
-            >
-              <option value={0}>全部订阅源{sources.length > 0 ? `（${sources.length}）` : ""}</option>
-              {sources.map((feed) => <option key={feed.id} value={feed.id}>{feed.name}</option>)}
-            </select>
-          </label>
-          <p className="text-xs text-muted-foreground">内容自动更新 · 无需登录</p>
-        </div>
+      <div className="mx-auto max-w-7xl md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
+        <aside aria-label="订阅源" className="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto border-r md:block">
+          {sourceNavigation}
+        </aside>
+        <main className="min-w-0 px-4 pb-12 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b py-5">
+            <div className="flex min-w-0 items-center gap-2">
+              <Rss className="size-4 shrink-0 text-muted-foreground" />
+              <h2 className="min-w-0 break-words text-sm font-medium">{scopeName}</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">内容自动更新 · 无需登录</p>
+          </div>
 
-        {feeds.isError && (
-          <div role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-muted p-4 text-sm">
-            <span>订阅源加载失败，请重试。</span>
-            <Button variant="outline" size="sm" onClick={() => void feeds.refetch()}>重试</Button>
-          </div>
-        )}
-
-        {items.isPending ? (
-          <div role="status" className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" />正在加载文章…
-          </div>
-        ) : items.isError && !items.data ? (
-          <div role="alert" className="py-20 text-center">
-            <p className="mb-4 text-sm text-muted-foreground">文章加载失败，请重试。</p>
-            <Button variant="outline" onClick={() => void items.refetch()}>重新加载</Button>
-          </div>
-        ) : (
-          <>
-            {items.isRefetchError && (
-              <div role="alert" className="pt-4 text-sm text-muted-foreground">内容更新失败，请点击顶部刷新按钮重试。</div>
-            )}
-            {articles.length === 0 ? (
-              <div className="py-20 text-center">
-                <Rss className="mx-auto mb-4 size-8 text-muted-foreground/60" />
-                <h2 className="text-base font-medium">最近 7 天还没有文章</h2>
-                <p className="mt-2 text-sm text-muted-foreground">订阅源的新内容抓取后会自动显示在这里。</p>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {articles.map((article) => (
-                  <PublicArticle
-                    key={article.id}
-                    article={article}
-                    feed={sourcesById.get(article.feed_id)}
-                    expanded={expandedId === article.id}
-                    onToggle={() => setExpandedId(expandedId === article.id ? null : article.id)}
-                  />
-                ))}
-              </div>
-            )}
-            {items.hasNextPage && (
-              <div className="pt-6 text-center">
-                {items.isFetchNextPageError && <p role="alert" className="mb-3 text-sm text-muted-foreground">更多文章加载失败，请重试。</p>}
-                <Button variant="outline" disabled={items.isFetching} onClick={() => void items.fetchNextPage()}>
-                  {items.isFetchingNextPage ? <><LoaderCircle className="size-4 animate-spin" />正在加载…</> : "加载更多"}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </main>
+          {items.isPending ? (
+            <div role="status" className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin" />正在加载文章…
+            </div>
+          ) : items.isError && !items.data ? (
+            <div role="alert" className="py-20 text-center">
+              <p className="mb-4 text-sm text-muted-foreground">文章加载失败，请重试。</p>
+              <Button variant="outline" onClick={() => void items.refetch()}>重新加载</Button>
+            </div>
+          ) : (
+            <>
+              {items.isRefetchError && (
+                <div role="alert" className="pt-4 text-sm text-muted-foreground">内容更新失败，请点击顶部刷新按钮重试。</div>
+              )}
+              {articles.length === 0 ? (
+                <div className="py-20 text-center">
+                  <Rss className="mx-auto mb-4 size-8 text-muted-foreground/60" />
+                  <h2 className="text-base font-medium">最近 7 天还没有文章</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">订阅源的新内容抓取后会自动显示在这里。</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {articles.map((article) => (
+                    <PublicArticle
+                      key={article.id}
+                      article={article}
+                      feed={sourcesById.get(article.feed_id)}
+                      expanded={expandedId === article.id}
+                      onToggle={() => setExpandedId(expandedId === article.id ? null : article.id)}
+                    />
+                  ))}
+                </div>
+              )}
+              {items.hasNextPage && (
+                <div className="pt-6 text-center">
+                  {items.isFetchNextPageError && <p role="alert" className="mb-3 text-sm text-muted-foreground">更多文章加载失败，请重试。</p>}
+                  <Button variant="outline" disabled={items.isFetching} onClick={() => void items.fetchNextPage()}>
+                    {items.isFetchingNextPage ? <><LoaderCircle className="size-4 animate-spin" />正在加载…</> : "加载更多"}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

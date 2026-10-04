@@ -1,8 +1,19 @@
+export interface PublicGroup {
+  id: number;
+  name: string;
+}
+
 export interface PublicFeed {
   id: number;
+  group_id: number;
   name: string;
   site_url?: string;
 }
+
+export type PublicScope =
+  | { kind: "all" }
+  | { kind: "group"; id: number }
+  | { kind: "feed"; id: number };
 
 export interface PublicItem {
   id: number;
@@ -43,10 +54,11 @@ async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 export const publicAPI = {
   feeds: (signal?: AbortSignal) =>
-    read<{ data: PublicFeed[] }>("/feeds", signal),
-  items: (feedId: number, cursor: string | null, signal?: AbortSignal) => {
+    read<{ data: PublicFeed[]; groups: PublicGroup[] }>("/feeds", signal),
+  items: (scope: PublicScope, cursor: string | null, signal?: AbortSignal) => {
     const params = new URLSearchParams({ limit: "30" });
-    if (feedId) params.set("feed_id", String(feedId));
+    if (scope.kind === "feed") params.set("feed_id", String(scope.id));
+    if (scope.kind === "group") params.set("group_id", String(scope.id));
     if (cursor) params.set("before", cursor);
     return read<PublicItemPage>(`/items?${params}`, signal);
   },

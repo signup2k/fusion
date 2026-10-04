@@ -490,21 +490,21 @@ Purpose: Defines the optional public hostname, read-only API, rolling 168-hour w
 
 ### backend/internal/model/public.go
 
-Purpose: Defines public feed metadata and article DTOs with no personal state or internal source configuration.
+Purpose: Defines public group names, feed membership metadata, and article DTOs with no personal state or internal source configuration.
 
 ### backend/internal/store/public.go
 
-Purpose: Reads current public source metadata and bounded article previews/details without querying read state.
-Structure: `PublicItemsParams` at L12; `ListPublicFeeds` at L21; `ListPublicItems` at L39; `GetPublicItem` at L73.
+Purpose: Reads current public group/source metadata and bounded article previews/details without querying read state.
+Structure: `PublicItemsParams` at L12; `ListPublicGroups` at L22; `ListPublicFeeds` at L40; `ListPublicItems` at L58; `GetPublicItem` at L96.
 
 ### backend/internal/handler/public.go
 
 Purpose: Recognizes the configured public hostname, denies writes and private routes there, and serves public feed/article endpoints.
-Structure: `isPublicRequest` at L19; hostname gate at L28; API gate at L53; feed list at L66; item list at L75; detail at L122.
+Structure: `isPublicRequest` at L19; hostname gate at L28; API gate at L53; feed/group catalog at L66; item list at L80; detail at L135.
 
 ### backend/internal/handler/public_test.go
 
-Purpose: Covers publication windows, stable pagination, source changes/filtering, state and metadata isolation, private route/write denial, CORS boundaries, and opt-in configuration.
+Purpose: Covers publication windows, stable pagination, source/group changes and filtering, state and metadata isolation, private route/write denial, CORS boundaries, and opt-in configuration.
 
 ### backend/internal/handler/handler.go
 
@@ -528,8 +528,12 @@ Purpose: Defines public API types and GET-only requests that omit credentials an
 
 ### frontend/src/components/public/public-reader.tsx
 
-Purpose: Renders a responsive chronological reader with source filtering, article expansion, pagination, theme selection, recovery actions, and minute-by-minute updates.
-Structure: `PublicReader` at L22; `PublicArticle` at L156. Expired cached rows are also removed on a 15-second client clock.
+Purpose: Renders a responsive chronological reader with a desktop source sidebar and mobile drawer, group/source filtering, article expansion, pagination, theme selection, recovery actions, and minute-by-minute updates.
+Structure: `PublicReader` near L26; `PublicArticle` near L184. Expired cached rows are also removed on a 15-second client clock.
+
+### frontend/src/components/public/public-source-nav.tsx
+
+Purpose: Displays shared group names and source membership, supports local group disclosure, and selects all/group/source scopes without private reader state or management actions.
 
 ### frontend/vite.config.ts
 

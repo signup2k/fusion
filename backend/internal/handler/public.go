@@ -69,7 +69,12 @@ func (h *Handler) listPublicFeeds(c *gin.Context) {
 		internalError(c, err, "list public feeds")
 		return
 	}
-	dataResponse(c, feeds)
+	groups, err := h.store.ListPublicGroups()
+	if err != nil {
+		internalError(c, err, "list public groups")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": feeds, "groups": groups})
 }
 
 func (h *Handler) listPublicItems(c *gin.Context) {
@@ -82,6 +87,14 @@ func (h *Handler) listPublicItems(c *gin.Context) {
 			return
 		}
 		params.FeedID = id
+	}
+	if raw := c.Query("group_id"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id <= 0 {
+			badRequestError(c, "invalid group_id")
+			return
+		}
+		params.GroupID = id
 	}
 	if raw := c.Query("limit"); raw != "" {
 		limit, err := strconv.Atoi(raw)

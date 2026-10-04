@@ -6,6 +6,14 @@ It uses the existing database and pull service. Adding, renaming, or deleting a
 feed on the private site is reflected by the next public query; new articles
 appear after the existing pull service ingests them.
 
+The source sidebar preserves the private site's group names and feed membership.
+Groups can be expanded or collapsed; selecting a group or source filters articles
+within the same public window. On small screens, the sidebar opens as a left
+drawer. Renaming groups, moving feeds, and deleting groups are reflected by the
+next catalog refresh. Deleting a group follows the existing behavior of moving
+its feeds to the default group. Navigation disclosure state stays local to the
+public page and does not access private reader preferences.
+
 ## Configuration
 
 Set `FUSION_PUBLIC_HOST` to a hostname without a scheme, port, or path, and route
@@ -37,10 +45,11 @@ are not extended to the public origin.
 
 These endpoints are available only on the configured public hostname:
 
-- `GET /api/public/feeds`: `{data: [{id, name, site_url?}]}`.
+- `GET /api/public/feeds`: `{data: [{id, group_id, name, site_url?}], groups: [{id, name}]}`.
 - `GET /api/public/items`: a preview page with `data`, `next_cursor`,
-  `window_start`, and `window_end`. Optional parameters are `feed_id`, `limit`,
-  and `before`. The default page size is 30 and the existing API limit applies.
+  `window_start`, and `window_end`. Optional parameters are `feed_id`, `group_id`,
+  `limit`, and `before`. Both scope filters apply when supplied together. The
+  default page size is 30 and the existing API limit applies.
 - `GET /api/public/items/{id}`: `{data: {id, feed_id, title, link, content?, pub_date}}`.
 
 Lists use publication time descending, then ID descending, with the existing
@@ -58,7 +67,7 @@ this only reads already-ingested content and does not trigger feed pulls.
 ## Verification
 
 `backend/internal/handler/public_test.go` covers chronological pagination,
-publication windows on lists and details, source filtering and source changes,
+publication windows on lists and details, source/group filtering, catalog changes,
 read-state isolation, absent private metadata, disabled-by-default access,
 private authentication, origin isolation, and denied writes with an owner session.
 The public frontend uses a separate Vite entry and shares only display utilities,

@@ -136,7 +136,7 @@ func TestPublicFeedsFollowSourceChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if feeds := readFeeds(); len(feeds) != 1 || feeds[0].ID != feed.ID {
+	if feeds := readFeeds(); len(feeds) != 1 || feeds[0].ID != feed.ID || feeds[0].GroupID != 1 {
 		t.Fatalf("new source not visible: %+v", feeds)
 	}
 	name := "Renamed source"
@@ -171,6 +171,119 @@ func TestPublicFeedsFollowSourceChanges(t *testing.T) {
 	w = performRequest(r, http.MethodGet, "http://"+testPublicHost+"/api/public/items/"+strconv.FormatInt(item.ID, 10), nil, nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("deleted source's article still visible: %d", w.Code)
+	}
+}
+
+func TestPublicGroupsFollowNamesMembershipAndDeletion(t *testing.T) {
+	h, st := newFeverTestHandler(t)
+	h.config.PublicHost = testPublicHost
+	r := h.SetupRouter()
+	group, err := st.CreateGroup("Technology")
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyGroup, err := st.CreateGroup("Empty group")
+	if err != nil {
+		t.Fatal(err)
+	}
+	readCatalog := func() ([]model.PublicGroup, []model.PublicFeed) {
+		t.Helper()
+		w := performRequest(r, http.MethodGet, "http://"+testPublicHost+"/api/public/feeds", nil, nil)
+		var catalog struct {
+			Groups []model.PublicGroup `json:"groups"`
+			Data   []model.PublicFeed  `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &catalog); err != nil || w.Code != http.StatusOK {
+			t.Fatalf("catalog: %d %s", w.Code, w.Body.String())
+		}
+		for _, field := range []string{"created_at", "updated_at", "unread_count", "fetch_state", "filter_keywords"} {
+			if strings.Contains(w.Body.String(), `"`+field+`":`) {
+				t.Fatalf("public catalog leaked %s", field)
+			}
+		}
+		return catalog.Groups, catalog.Data
+	}
+	groups, _ := readCatalog()
+	if len(groups) != 3 || groups[1].ID != group.ID || groups[1].Name != group.Name || groups[2].ID != emptyGroup.ID {
+		t.Fatalf("current and empty groups missing: %+v", groups)
+	}
+	var groupedFeeds []*model.Feed
+	var recent []*model.Item
+	now := time.Now().Unix()
+	for i, groupID := range []int64{group.ID, group.ID, 1} {
+		feed, err := st.CreateFeed(groupID, fmt.Sprintf("Source %d", i), fmt.Sprintf("https://example.com/feed/%d", i), "https://example.com", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		groupedFeeds = append(groupedFeeds, feed)
+		item, err := st.CreateItem(feed.ID, "recent", "Recent article", "https://example.com/article", "content", now-60)
+		if err != nil {
+			t.Fatal(err)
+		}
+		recent = append(recent, item)
+	}
+	for _, date := range []int64{now - publicWindowSeconds - 60, now + 3600} {
+		if _, err := st.CreateItem(groupedFeeds[0].ID, strconv.FormatInt(date, 10), "Outside window", "https://example.com/article", "content", date); err != nil {
+			t.Fatal(err)
+		}
+	}
+	readItems := func(query string) ([]model.PublicItem, *string) {
+		t.Helper()
+		w := performRequest(r, http.MethodGet, "http://"+testPublicHost+"/api/public/items?"+query, nil, nil)
+		var page struct {
+			Data       []model.PublicItem `json:"data"`
+			NextCursor *string            `json:"next_cursor"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || w.Code != http.StatusOK {
+			t.Fatalf("group articles: %d %s", w.Code, w.Body.String())
+		}
+		return page.Data, page.NextCursor
+	}
+	groupQuery := fmt.Sprintf("group_id=%d", group.ID)
+	items, cursor := readItems(groupQuery + "&limit=1")
+	if len(items) != 1 || items[0].ID != recent[1].ID || cursor == nil {
+		t.Fatalf("unexpected first group page: %+v, %v", items, cursor)
+	}
+	items, cursor = readItems(groupQuery + "&limit=1&before=" + url.QueryEscape(*cursor))
+	if len(items) != 1 || items[0].ID != recent[0].ID || cursor != nil {
+		t.Fatalf("unexpected last group page: %+v, %v", items, cursor)
+	}
+	items, _ = readItems(groupQuery + fmt.Sprintf("&feed_id=%d", groupedFeeds[2].ID))
+	if len(items) != 0 {
+		t.Fatalf("combined group/feed filters escaped the group: %+v", items)
+	}
+	items, _ = readItems(fmt.Sprintf("group_id=%d", emptyGroup.ID))
+	if len(items) != 0 {
+		t.Fatalf("empty group returned articles: %+v", items)
+	}
+	if err := st.UpdateGroup(group.ID, "Renamed technology"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpdateFeed(groupedFeeds[1].ID, store.UpdateFeedParams{GroupID: &emptyGroup.ID}); err != nil {
+		t.Fatal(err)
+	}
+	groups, feeds := readCatalog()
+	if groups[1].Name != "Renamed technology" || feeds[1].GroupID != emptyGroup.ID {
+		t.Fatalf("group rename or feed move not reflected: %+v, %+v", groups, feeds)
+	}
+	items, _ = readItems(groupQuery)
+	if len(items) != 1 || items[0].ID != recent[0].ID {
+		t.Fatalf("group still contains moved feed: %+v", items)
+	}
+	if err := st.DeleteGroup(group.ID); err != nil {
+		t.Fatal(err)
+	}
+	groups, feeds = readCatalog()
+	if len(groups) != 2 || groups[1].ID != emptyGroup.ID || feeds[0].GroupID != 1 {
+		t.Fatalf("deleted group or reassignment not reflected: %+v, %+v", groups, feeds)
+	}
+	items, _ = readItems(groupQuery)
+	if len(items) != 0 {
+		t.Fatalf("deleted group still exposes articles: %+v", items)
+	}
+	items, _ = readItems("group_id=1")
+	if len(items) != 2 || items[0].ID != recent[2].ID || items[1].ID != recent[0].ID {
+		t.Fatalf("default group did not receive reassigned feed: %+v", items)
 	}
 }
 
@@ -236,7 +349,7 @@ func TestPublicReaderDisabledAndInputValidation(t *testing.T) {
 	}
 	h.config.PublicHost = testPublicHost
 	r := h.SetupRouter()
-	for _, query := range []string{"feed_id=0", "feed_id=-1", "feed_id=abc", "limit=0", "limit=-1", "limit=abc", "before=invalid", "before=100_-1"} {
+	for _, query := range []string{"feed_id=0", "feed_id=-1", "feed_id=abc", "group_id=0", "group_id=-1", "group_id=abc", "limit=0", "limit=-1", "limit=abc", "before=invalid", "before=100_-1"} {
 		w = performRequest(r, http.MethodGet, "http://"+testPublicHost+"/api/public/items?"+query, nil, nil)
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("query %q = %d, want 400", query, w.Code)
